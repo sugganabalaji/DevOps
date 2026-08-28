@@ -1,0 +1,230 @@
+============================
+MASTER and SLAVE
+============================
+
+MASTER AND SLAVE:
+when we continuously build jobs on Jenkins ,it will get load and have the chance to crash.
+to avoid this load on Jenkins we use salve servers to build the jobs
+
+Setup Master
+============
+
+Install Jenkins with Script
+
+
+SETUP: SLAVE 1
+---------------
+CREATE AN EC2 INSTANCE Amazon Linux 2 AND INSTALL JAVA-11/17
+
+
+sudo yum install java-21-amazon-corretto-devel maven git -y
+
+sudo mount -o remount,size=2G /tmp
+
+Dashboard -- > Manage Jenkins -- >Nodes -- > New node-- > name: salve1 -- > Permanent Agent -- > create
+
+Number of executors    : 3 (number of parallel build we can do)
+Remote root directory   : /tmp (where your op is going to store)
+Labels            : slave1 (way of assigning work to particular slave)
+Usage            : last opt
+Launch method        : last opt
+Host            : private-ip of slave
+Credentials        : add -- > Jenkins -- >
+kind: ssh username with private key
+Username: ec2-user
+Private Key: enter directly -- > copy paste the pem content
+Host Key Verification Strategy: last opt
+
+
+================
+Now Setup Slave 2
+
+Follow above process -- but one thing generally miss - install amazon-linux-extras install java-openjdk11 -y on slave 2 first and then add node in Jenkins
+
+Create a job , execute on build
+
+if build fails --> on slave see java version
+
+update-alternatives --config java
+
+run the build again
+
+--> if you want to run the pipeline using slave not in configuring Jenkins(Restrict where this project can be run), but directly through pipeline use the below script as agent label
+
+Example 2 with Pipeline
+-------------------------
+
+
+pipeline {
+    agent {
+        label 'slave1'
+    }
+
+    stages {
+        stage('checkout') {
+            steps {
+                git 'https://github.com/ReyazShaik/java-project-maven-new.git&#39;
+        (or)
+        git branch: 'main', url: 'https://github.com/ReyazShaik/java-project-maven.git&#39;
+            }
+        }
+        stage('compile') {
+            steps {
+                sh 'mvn compile'
+            }
+        }
+        stage('test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+        stage('artifact') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+        stage('Deployment') {
+            steps {
+                echo 'Code is deploy - actual we need to learn tomcat, using tomcat we deploy'
+            }
+        }
+    }
+}
+
+
+================
+Monitor Slave machines --> Click on Node --> left side --> Load statistics, System info , Build history etc
+
+
+
+=====================================
+SONARQUBE
+=====================================
+It is a tool used to check the code quality
+it supports 20+ langauges
+it used to check the bugs, code smells, code duplication, and vulnerabilities.
+it require 2 cpus and 2 gb RAM.
+Dependency: Java-21
+port number: 9000
+
+ADVANTAGES:
+check the bugs
+improve the code quality
+improve the developer skills
+remove duplicate codes
+check the security issues(vulnerabilities)
+
+====== TAKE SonarQube.sh to install ======
+
+
+SETUP: Launch another EC2 instance - Amazon linux 2023 - t2.medium is must , it will not run on micro
+
+============ script ========================
+#! /bin/bash
+#Launch an instance with 9000 and t2.medium
+cd /opt/
+wget https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-8.9.6.50800.zip
+unzip sonarqube-8.9.6.50800.zip
+sudo yum install java-17-amazon-corretto -y
+useradd sonar
+chown sonar:sonar sonarqube-8.9.6.50800 -R
+chmod 777 sonarqube-8.9.6.50800 -R
+su - sonar
+# use the below command manually after installation
+#sh /opt/sonarqube-8.9.6.50800/bin/linux/sonar.sh start
+#echo "user=admin & password=admin"
+
+=================================================
+
+once installed
+manually type below command
+
+sh /opt/sonarqube-8.9.6.50800/bin/linux-x86-64/sonar.sh start
+
+dont run this - echo "user=admin & password=admin"
+
+==================
+
+==============================
+If you have stopped the sonar, start the sonar manually
+su - sonar
+sh /opt/sonarqube-8.9.6.50800/bin/linux-x86-64/sonar.sh start
+===============================
+
+Open http://IP:9000
+
+username: admin,
+Password : admin
+
+
+
+Add project --> Manually --> project key =boomapp --> generate token--> boomapp --> click on maven
+
+adaa1f0e77d68dde80fde6b61072214e3b076ea5
+
+In Jenkins: Add plugin,
+======================
+
+SonarQube Scanner,
+Maven Integration
+Sonar Scanner Quality Gates
+RESTART JENKINS
+
+Go to Credentials
+-----------------
+--> Kind= Secret text , secret = c7fc89bc61e79ad060081f980aa3b0a40dfe9115 (sonar project key)
+id --> sonar , description = sonar
+
+Go to System
+-------------
+--> SonarQube servers --> Enable Environment Variables --> Add SonarQube Server
+     Name = SonarQube
+     URL = http://3.110.190.217:9000
+     Server authentication token = select token - sonar
+
+
+Go to  Tools
+-------------
+--> SonarQube Scanner installations , Name = sonarscanner --> dont click add installer
+
+
+
+
+
+update the code in the pipeline  -- udpdate sonar before artifact, as we need to first scan the code and create artifact
+
+note:  Dsonar.login=e2230d52b1ef8f7581bc4e9df5b08470c039e7b4'  is the key in SonarQube
+===============================
+
+pipeline {
+    agent any
+    stages {
+        stage('checkout') {
+            steps {
+                git 'https://github.com/ReyazShaik/java-project-maven-new.git&#39;
+            }
+        }
+        stage('compile') {
+            steps {
+                sh 'mvn compile'
+            }
+        }
+        stage('test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh 'mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.7.0.1746:sonar'
+                }
+            }
+        }
+        stage('artifact') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+    }
+}

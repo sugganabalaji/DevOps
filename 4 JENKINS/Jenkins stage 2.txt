@@ -1,0 +1,279 @@
+Transferring Files from Jenkins to Remote Server
+===============================================
+
+1. Setup connection from Jenkins to remote server
+2. Install SSH plugins
+3. Create a job to copy files to remote server
+
+
+Have 2 Servers
+1. Jenkins Server
+2. Test Server (Amazon Linux 2023)
+
+In Jenkins Server
+
+ssh-keygen
+
+eval $(ssh-agent -s)        --- to start the SSH agent and to see the PID
+
+vi MyKey.pem
+copy paste pem data
+
+chmod 400 MyKey.pem
+
+ssh-add MyKey.pem
+
+cd /root/.ssh/
+
+ssh-copy-id -i id_rsa.pub ec2-user@172.31.22.33
+
+Testing to connect = ssh ec2-user@172.31.22.33
+
+install ssh plugins
+---------------
+
+Manage Jenkins --> Plugins --> Publish Over SSH
+
+Manage Jenkins --> System --> Publish Over SSH
+
+cd /root/.ssh
+cat id_rsa
+
+--> Publish over SSH --> key -->
+
+Paste this id_rsa data in "Key" section in Jenkins
+
+SSH Server --> ADD
+Name = TestServer
+Hostname = Private IP
+Username = ec2-user
+Test Configuration
+
+Create a new job
+-----------------
+
+New item --> Remotefiles --> FreeStyle --> OK
+
+Build Steps --> Send files or execute commands over SSH -->
+Name = autoselect
+
+Build now --> First build empty job because it will create a directory in workspace
+
+cd /var/lib/jenkins/workspace/remotefiles/
+mkdir files
+touch test.py
+
+
+Sourcefiles = files/test.py  or top copy multiple files files/*
+
+Remove Prefix = empty [if you want to remote prefix directory and copy only files]
+Remote Directory = empty [you can specify remote server directory to copy]
+Exec command = Empty [if you want to execute file, sh /home/ec2-user/files/bash.sh]
+
+Advance --> Exclude files if you want -->Exclude files --> files/test1.py, files/test2.py
+
+Build now
+
+See the files in remote server --> /home/ec2-user/files/
+
+
+======================================================================================
+
+ Variables , Jenkins admin activities, PASSWORDLESS LOGIN, BUILD Executors
+===================================================================================
+
+Setup Jenkins using shell script --> Jenkins.sh
+sh Jenkins.sh
+
+Restore Deleted Job
+=================
+
+If you accidentally delete the job , how to restore
+
+Install plugin = job configuration history
+
+Delete a job now --> Go to Dashboard --> click on job config history --> show delete jobs --> restore
+
+note: If you install the plugin initially then all jobs create after plugin installation , restore option is available
+
+Create a new job and delete
+
+Delete a job now --> Go to Dashboard --> click on job config history --> show delete jobs --> restore
+
+
+==============
+VARIABLES
+=============
+
+VARIABLES: are used to store values, changes frequently : ex: Name = Reyaz
+
+ 1. User Defined Variables 2. Jenkins Env Variables
+
+1. USER DEFINED VARS: these variables will be declared by user.
+
+    --> LOCAL VARS: these variables will work inside job, works for only one job
+
+    --> GLOBAL VARS: these variables will work for all jobs in Jenkins
+
+2. JENKINS ENV VARIABLES: these variables will be given by Jenkins.
+user cant define Jenkins variables.
+
+Example for Local variable :
+===========================
+
+Create a new job --> Free Style --> Build Step --> Execute shell (no git required)
+
+echo "This is DevOps Course, here you are learning DevOps, DevOps is good "
+
+--> Here every time you use DevOps , instead mention it as a Variable course = devops
+
+course=DevOps  --> no space
+echo "This is $course Course, here you are learning $course, $course is good "
+
+save and build now
+
+and configure build again and change course variable as AWS and build now
+
+Example for Global variable :
+===========================
+
+Now remove, course=DevOps in build and build now, Jenkins will not understand
+
+Now set Global Variables
+
+Dashboard -> Manage Jenkins --> System --> Global properties --> Environment variables --> ADD --> name = course, value = DevOps
+
+Example for Jenkins Env variables :
+===========================
+
+Create a new Job --> Free Style --> Build Step --> Execute shell (no git required)
+click on list of available environment variables
+echo "The Current Build Number is $BUILD_NUMBER, Job Name is $JOB_NAME"
+Build now and see the output
+
+if you want all env to print use in shell : printenv and run the build
+
+
+| Variable          | Description                        |
+| ----------------- | ---------------------------------- |
+| `BUILD_NUMBER`    | Current build number               |
+| `BUILD_ID`        | Build ID                           |
+| `BUILD_URL`       | URL of the build                   |
+| `JOB_NAME`        | Name of the job                    |
+| `JOB_BASE_NAME`   | Short job name                     |
+| `WORKSPACE`       | Workspace directory                |
+| `JENKINS_HOME`    | Jenkins home directory             |
+| `JENKINS_URL`     | Jenkins URL                        |
+| `NODE_NAME`       | Agent node name                    |
+| `NODE_LABELS`     | Labels assigned to node            |
+| `EXECUTOR_NUMBER` | Executor number                    |
+| `GIT_COMMIT`      | Git commit hash                    |
+| `GIT_BRANCH`      | Git branch name                    |
+| `GIT_URL`         | Git repository URL                 |
+| `BUILD_TAG`       | Build tag                          |
+| `BRANCH_NAME`     | Branch name (Multibranch Pipeline) |
+| `CHANGE_ID`       | Pull Request ID                    |
+| `CHANGE_TARGET`   | Target branch of PR                |
+
+
+
+===================================
+JENKINS Port Change:
+==================================
+TO search a file -- find / -name Jenkins.service
+
+vi /usr/lib/systemd/system/jenkins.service
+line 72 (8080=8069)
+systemctl daemon-reload
+systemctl restart jenkins.service
+
+===========================
+Jenkins without Password Login
+=========================
+find / -name config.xml
+vi /var/lib/jenkins/config.xml (true=false)
+<useSecurity>true</useSecurity>   ---> False
+systemctl restart jenkins.service
+
+Put IP in browser and directly it will login without asking username and password
+
+==================
+BUILD Executors - Builds running parallelly
+=================
+
+By default Jenkins runs the jobs sequentially --> click on the build 2 times , it will run only 2 at a time
+
+Manage Jenkins --> System --> # of executors = 2 by default
+
+if you want to run parallelly --> Job --> configure --> Execute concurrent builds if necessary --> build now (now run parallel)
+
+or
+
+Go to Dashboard --> Click on Build Executors Status-->Built-In Node--> Configure --> Number of executors --> 10
+
+
+=================
+Pollscm, webhoook, throttle build, troubleshooting, Remote Triggering
+==================
+
+=======
+POLLSCM
+=======
+
+CRON just run at that time based on schedule, but it will not take updated code from Repo,
+What if I need like , someone push the code or my source code change, automatically build should happen based on schedule
+
+CRON will just run the job on scheduled time. But it doesn't check the code change.
+POLLSCM will run the job on scheduled time but it will check the code change.
+
+Go to Job --> configure --> remove Build periodically if enabled and enable POLLSCM --> 20 14 8 7 1 (UTC time, 14:20 8th July monday)
+
+Change the Code in index.jsp and wait for the time, it will build automatically only if code change(POLLSCM)
+
+IF dev want to run the build immediately , he cannot wait for the CRON to build as per POLLSCM , we use webhook
+
+============
+WebHook
+============
+
+Webhook - It will trigger the build immediately when you commit the code in SCM
+
+Go to GitHub --> Select Repo --> Settings --> Webhook --> Add Webhook --> Payload URL --> http://13.200.252.207:8080/github-webhook/
+--> Content Type --> Application/Json --> Add webhook
+
+-> Now Create a new job --> Free Style --> git --> Repo url(java-project) --> branch (/main or /master) --> Build Trigger --> GitHub hook trigger for GITScmpolling --> Build Step --> Maven target --> clean package
+
+Do any change in index.jsp
+
+--> in AWS SG enable ALL traffic because GitHub needs to connect to your ec2 Jenkins
+
+===============
+THROTTLE BUILD:
+===============
+ It will restrict the number of builds per interval.
+create a  job -- > Throttle build -- > builds: 3 time period: hours -- > save --> make a build and test
+
+================
+Remote Triggering
+=================
+Create a job --> Build Triggers --> Trigger build remotely --> Authentication Token : Reyaz --> Save
+
+Copy the URL , change values and put in browser
+
+JENKINS_URL/job/cijob/build?token=TOKEN_NAME   /  http://13.233.214.180:8080/job/firstjob/build?token=reya
+
+Build will start automatically now
+
+
+===========
+Linked Jobs - Link the jobs with each other --> first job will trigger another job
+==========
+
+Create job1 and job2 with build steps --> execute shell --> echo "welcome"
+
+Upstream and downstream
+
+
+job1 - Post-build Actions -->Build other projects--> Projects to build --> job2
+
+Build the job now, and once first job build done and second job will get trigger

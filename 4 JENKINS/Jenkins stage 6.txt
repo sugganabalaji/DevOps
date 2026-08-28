@@ -1,0 +1,219 @@
+=======================================
+Nexus - Integration Jenkins with Nexus - USE AL2 with 30GB t2.medium
+=======================================
+
+wget https://download.sonatype.com/nexus/3/nexus-unix-x86-64-3.79.0-09.tar.gz
+tar -zxvf nexus-unix-x86-64-3.79.0-09.tar.gz
+yum install java-17-amazon-corretto -y
+sudo useradd nexus
+chown -R  nexus:nexus  nexus-3.79.0-09
+sudo sh nexus-3.79.0-09/bin/nexus start
+
+
+
+
+or see script from my github
+
+sh nexus restart
+sh nexus start
+sh nexus status
+
+
+http://server_IP:8081
+========================================================================================
+
+Click on SignIN --> Username = admin, password = cat /opt/nexus/sonatype-work/nexus3/admin.password
+                                                cat /home/ec2-user/sonatype-work/nexus3/admin.password
+
+Creating Repo
+=============
+Click on Setting Symbol --> Repositories --> Create repository --> maven2(hosted) --> name(hotstar) --> save
+
+Version Policy --> Snapshot
+
+checkbox online
+
+Deployment policy --> allow to redeploy
+
+
+
+Integrate Nexus to Jenkins Pipeline
+================================
+
+Jenkins (Code --> Build --> Test --> Artifact) --> Nexus
+
+If you want to integrate any 3rd party to Jenkins, install plugins
+
+1. Download the Plugins (nexus artifacts uploader)
+   --> Manage Jenkins --> Plugins --> Available Plugins --> Just type only Nexus , it will give nexus artifacts uploader
+2. Configure in Jenkins pipeline in stage
+
+Note: all the information will be available in pom.xml file
+
+First create Credentials for Nexus
+----------------------------------
+
+Manage Jenkins --> Credentials --> Username = admin, password = root123  , id = nexus , description = nexus
+
+Create a new pipeline job --> and copy paste the script and click on pipeline systax
+
+sample step : nexusartifactuploader
+Nexus Version : see nexus version in browser left top 3.0
+Protocol:http
+Nexus URL : IP:8081 (dont put http)
+Credentials : Add --> Jenkins --> username:admin, password: root123, description: nexus
+credentials: select admin
+Groupid: see pom file (in.reyaz)
+version: see pom file (1.2.2) 8.3.3-SNAPSHOT
+Repository: repo that you created in nexus  : hotstar
+Artifact: Add : Artifactid: see pom (myapp) , Type = .war, classifier = empty,  File = target/myapp.war
+ --> generate pipeline script
+
+nexusArtifactUploader artifacts: [[artifactId: 'myapp', classifier: '', file: 'target/myapp.war', type: '.war']], credentialsId: 'nexus', groupId: 'in.reyaz', nexusUrl: '13.126.193.100:8081', nexusVersion: 'nexus3', protocol: 'http', repository: 'hotstar', version: '8.3.3-SNAPSHOT'
+
+pipeline {
+    agent any
+
+    stages {
+        stage('checkout') {
+            steps {
+                git 'https://github.com/ReyazShaik/java-project-maven-new.git&#39;
+            }
+        }
+        stage('compile') {
+            steps {
+                sh 'mvn compile'
+            }
+        }
+        stage('test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+        stage('artifact') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+        stage('nexus') {
+            steps {
+                nexusArtifactUploader artifacts: [[artifactId: 'myapp', classifier: '', file: 'target/myapp.war', type: '.war']], credentialsId: 'nexuscreds', groupId: 'in.reyaz', nexusUrl: '13.127.129.23:8081', nexusVersion: 'nexus3', protocol: 'http', repository: 'hotstarapp', version: '8.3.3-SNAPSHOT'
+            }
+        }
+
+    }
+}
+
+
+
+
+
+===========================================
+RBAC  - Role Based Access Control - to restrict user
+============================================
+
+Control permission of users in Jenkins , each user can access only few things in Jenkins
+
+TO restrict the USER PERMISSIONS in Jenkins
+
+Create User:
+-----------
+Manage Jenkins --> Users --> Create User --> Suresh, Ramesh, etc
+
+To give permissions , download plugin
+
+Manage Jenkins --> Plugins --> Available Plugins --> just type Role , you will get Role based Authorization Strategy and install
+
+Configure the plugin
+--------------------
+Manage Jenkins --> Security --> Authorization (by default it has : Logged in users can do anything , anyone can do anything), now select Role based stragegy
+
+Once you select Role based strategy and save, come back to Manage Jenkins -->  now we can see Manage and Assign Roles
+
+create 2 roles Manage role -- >Role to add -->  Senior --> Add --> Again add -- > Junior
+
+Manage Jenkins --> users --> create users
+
+For senior give admin permissions and for Junior give Read
+
+Now Assign Roles --> Add user --> suresh --> give junior
+
+Ex: Login as suresh and keep on giving the access(like build, configure etc) and refresh suresh Jenkins in separate browser he will see menus
+
+Authentication - Permission to sign in
+Authorization - Permission to work
+
+Ex: students can come to class , we are all authenticated, but who will teach class, Reyaz sir, he is authorized to teach
+
+Another way to giving permissions
+---------------------------------
+
+In Authorization = Project based Matrix Strategy
+
+Manage Jenkins --> Security -->  --> authorization --> Project based Matrix Strategy --> add user and give permission there, overall read, under job --> build, configure, and read
+
+Assign user to see the job
+-------------------
+
+Select job --> configure --> Enable Project Based Security --> Add user --> Ramesh
+
+TASKS : create user and give only to read jobs
+
+
+CUSTOM WORKSPACE
+================
+
+create a normal job freestyle --> git --> maven --> clean package
+
+We can give the custom path also --> go to build --> configure --> advance --> use custom workspace --> /home/ec2-user/Reyaz
+
+The above build will fail because it doesn't have permission to /home/ec2-user/Reyaz
+
+cd /
+ls -al
+see root directory doesn't have access to Jenkins users
+
+now give permissions to Jenkins user
+
+chown Jenkins:jenkins home/
+chown Jenkins:jenkins home/ec2-user/
+now Reyaz folder needs to get Jenkins user
+chown Jenkins:jenkins home/ec2-user/reyaz
+
+ls -al --> now can see Jenkins user to home
+
+Now, build the jobs , now can save the data in home/ec2-user/reyaz
+
+
+LINKED JOBS
+===========
+
+Have job1 and job2 freestyle build
+
+if you want to run the jobs one after another
+
+Job1 --> configure --> Post-build Actions --> Build other projects --> job2
+
+
+
+======================================
+
+APPEARANCE
+============================
+
+Manage Jenkins --> appearance --> but here there is not Customizable theme , for this download plugin "simple theme" and install
+
+Manage Jenkins --> appearance --> Customizable theme --> Add --> CSS theme and put URL
+
+just search in google "Jenkins UI theme css url"
+
+https://cdn.rawgit.com/afonsof/jenkins-material-theme/gh-pages/dist/material-cyan.css
+
+https://cdn.rawgit.com/afonsof/jenkins-material-theme/gh-pages/dist/material-red.css  (change the color you want)
+
+==========
+
+Remove build
+=============
+
+From servers, delete the builds or Configure --> general --> discard old builds
