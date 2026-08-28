@@ -1,0 +1,467 @@
+==========================================
+Now time to commit to Remote Repo to GitHub
+--------------------------------------------
+
+Sign up to GitHub and create a sample test public repository
+
+touch python{1..10}
+touch hello.txt
+git add .
+git commit -m "python files" .
+
+git remote add origin https://github.com/sugganabalaji/testrepo.git  ---> copy this command from GitHub --> this will be done only first time
+
+once above command executed , in .git folder, cat config file, remote origin got added --> show this file
+
+git push -u origin master --> this will be used to commit the changes from local to central repo
+
+git username:
+git password or personal token [generate the token from github]
+
+git config --global credential.helper cache        ---> not to ask for the password every time
+
+git credential-cache exit    --> TO remove credentials
+
+git remote -v
+
+Example
+--------
+ghp_Ro6n9e4erllf2ngS1k3oEMIDm8eyBe3KLm5
+
+Now refresh the GitHub page and you can see the files
+
+--> In Local, open hello.txt and add some content here
+--> git status --> now you can see the file in red color which is modified, now you need to stage this file
+--> git add hello.txt --> now you have staged this file, if you want all the files to stage use
+git add --a
+--> git status --> now this is green color, ready to commit
+
+
+
+--> git commit -m 'modified hello.txt' --> this is now committed to local repo, you need to push to central pro GitHub
+--> git push --> no need to add origin, that is only for first time and also no need to add remote origin that is also for first time
+
+Lets try again
+
+--> modify another file test.txt
+--> git status
+--> git add test.txt
+
+If you want to un-stage existing file use RESET command .
+if you want already added file to un-stage use reset command , for brand new file use rm command (difference rm - brand new file to un-stage , reset - existing file to un-stage)
+
+git reset HEAD <filename>
+
+git add .
+
+-Now, redo what ever you have modified in the file
+
+--> git commit -m 'modified test'
+--> git push
+
+
+
+====================
+git Fetch and git pull
+====================
+
+--> Now, create a new file in GitHub  python11 file, to fetch and pull the files from remote to local
+
+git fetch  --> this will download only the changes but will not update the working tree
+
+ls
+
+git pull   --> Downloads and integrate updates into current branch
+
+now see python11
+
+git log ---- to see latest commit message
+
+
+git fetch will just shows the changes / Downloads updates but does not integrate them.
+git pull will pull the entire data / Downloads and integrates updates into the current branch.
+
+==========
+git clone : If you want to download all the remote code to local
+==========
+
+
+mkdir herodir
+cd herodir
+
+git clone https://github.com/sugganabalaji/test.git
+
+git log
+
+This is new user, he/she can see what ever that has commited before on this repo that is why it is distributed version control system
+
+vi python12
+This is python12
+
+git add python12
+git commit -m "python12" python12
+git push
+
+see in github
+
+git credential-cache exit   -- remove credentials
+
+Another way to Authenticate and push to GIT with SSH
+================================================
+
+### To generate SSH Key
+
+ssh-keygen (give this command into your terminal)
+
+copy the publickey id_rsa.pub
+
+paste into github ssh keys
+
+path : settings-->ssh and GPG keys--> Add new ssh key and give any name and paste it your publickey over there
+
+
+cd /home/ec2-user/
+
+git remote add origin git@github.com:sugganabalaji/test1.git
+
+git remote -v  --> to check the remote repo details
+
+git push -u origin master
+
+
+
+=============================================================================
+
+
+Branch Concept - see paint
+======================
+keep the master branch clean first
+
+If you dont have any single commit, it will not show the branch. Once you do 1 commit, it shows master branch
+
+touch index.html
+git add index.html
+git commit -m "index commit" index.html
+git status
+git branch --> it will show the branch master, default branch
+
+if you commit atleast 1 file, it will show the master branch
+
+Its not good to work everyone on master branch, individual developer create their own branch
+
+dev1branch
+==========
+git branch dev1branch  --> it will create a new branch dev1branch from master
+git branch --> to list the branches, * represent the current branch
+git checkout dev1branch --> to switch branch
+git branch
+touch dev1file{1..5}
+git add dev1file*
+git commit -m "dev1" dev1file*
+
+dev1branch has 1 + 5 files = 6 (it got 1 file from master)
+
+dev2branch
+==========
+git branch dev2branch --> this will create a new branch dev2branch from dev1branch as we are now in dev1branch
+git branch
+git checkout dev2branch
+git branch
+touch dev2file{1..5}
+git add dev2*
+git commit -m "dev2 commit" dev2*
+
+dev2branch has 1 + 5 + 5 = 11
+
+dev3branch
+===========
+git branch
+git branch dev3branch --> this will create a new branch from dev2branch
+git checkout dev3branch
+              or
+git checkout -b dev3branch --> this will also create and checkout branch dev3branch, 2 commands in 1 shot
+git branch
+touch dev3file{1..5}
+git add dev3*
+git commit -m "dev3 commit" dev3*
+
+dev3branch has 11 + 5= 16
+
+dev4branch
+===========
+Now i want to create a new branch from master not from dev3
+
+Now I want to checkout from master not from dev3 , so first checkout to master and create a branch, it will get only
+
+git branch
+git checkout master
+ls
+git branch dev4branch
+git checkout dev4branch
+ls
+
+ls --> it should list only index.html
+touch dev4file{1..5}
+git add dev4*
+git commit -m "dev4 commit" dev4*
+
+dev4branch has 1 + 5 = 6
+
+
+**** rename branch
+
+git branch -m dev5branch devnewbranch  [renaming dev5branch to devnewbranch]
+
+=======================
+GIT MERGE - Merge between 2 branches
+======================
+
+git branch
+be in master
+
+git checkout master
+
+git merge dev1branch  --- what ever we have files in dev1branch will come to master
+
+Now push to GitHub, create a GitHub account
+========================================
+git branch
+
+git remote add origin https://github.com/sugganabalaji/testrepo.git
+
+git config --global credential.helper cache
+
+
+git push origin master --> push the code of master to GitHub
+username:
+password: paste the token here
+GitHub removed password authentication and put token system for better security
+Generate token from GitHub
+Profile --> settings --> developer settings --> personal access token --> classic -->
+Generate new token --> classic --> name:gitlearn --> select repo scopes --> generate
+
+Now push dev1branch files
+
+git push origin dev1branch --> now see 2 branches in GitHub
+git push origin dev2branch --> now see 3 branches in GitHub
+git push origin dev3branch --> now see 4 branches in GitHub
+git push origin dev4branch --> now see 5 branches in GitHub
+
+=======================
+GIT MERGE - Merge between 2 branches
+======================
+
+git branch
+
+git checkout dev2branch -- see the files
+
+git checkout dev1branch -- see the files
+
+git merge dev2branch  --- what ever we have files in dev2branch will come to dev1branch
+
+another command instead merge use rebase
+
+git rebase dev4branch
+
+Git Merge: Keeps the history intact and is safer for shared branches. Ideal for collaborative projects.
+Git Rebase: Rewrites history for a cleaner, linear commit log. Best suited for private or feature branches.
+
+======================
+GIT REVERT -- accidental merges from one branch to another branch and undo those
+
+git branch
+
+git merge dev2branch
+
+ls
+
+git revert dev2branch --> this will delete the files from current branch which was merged
+(don't to any changes to file, just quit the file)
+
+========================
+GIT BRANCH another example
+=========================
+
+--> Create one test repo in GitHub
+
+
+mkdir branchdemo
+cd branchdemo
+git init
+touch python{1..10}
+
+vi python1
+This is python1
+nice code. log code
+
+git add .
+git commit -m "pythonfiles" .
+
+git branch
+
+== what ever we are doing is in master branch
+== A new developer came and said i will do some changes, is it good to do directly in master?
+== create a new branch for developer
+
+git branch developer
+git branch
+git checkout developer
+
+vi python11
+This is python11
+
+vi python1
+added new lines
+
+git add .
+
+git commit -m "pythonfilesnew added" .
+
+== No impact on master branch
+== Now lets go to master branch and see the data
+
+git checkout master
+
+ls
+
+== Here we don't have python11 and python1 changes
+
+if i want developer changes to master
+
+git merge developer  [merging code from developer branch]
+
+git remote add origin https://github.com/sugganabalaji/branching.git
+
+Note: if you want to change remote origin " git remote set-url origin https://github.com/sugganabalaji/branching.git&quot;
+
+git push -u origin master
+
+== Now see in GitHub, but you can see only one branch in GitHub because we pushed from master, GitHub doesn't know developer branch yet
+
+git checkout developer
+vi python1
+added worst code
+version 1.2.3
+
+git add .
+
+git commit -m "pythonfilesnew added" .
+
+git push origin developer [we need to push from developer branch]
+
+== Now in GitHub, you get Compare and Pull Request --> Merge Request
+== After merging master branch contains the code of Developer branch
+
+In your terminal, if you want to get latest code from GitHub
+
+git checkout master
+
+git pull
+
+
+git merge
+========
+
+git checkout developer
+vi python1
+version 1.2.3.4
+
+git add .
+git commit -m "1.2.3.4" python1
+
+git checkout master
+vi python1
+version 1.2.3.4.5
+
+git add .
+git commit -m "1.2.3.4.5" python1
+
+git merge developer
+-- merge conflit
+
+vi python1
+
+remove which ever you need, we can commit only 1
+save it
+
+git add python1
+git commit --> no need to put filename
+
+merge file will come , just wq!
+
+git status
+
+
+
+
+=======================
+GIT REBASE - same as MERGE
+=======================
+
+git rebase dev3branch -- now you see dev3 also in dev1branch
+
+==========================
+
+MERGE vs REBASE
+
+Merge for public repos, rebase for Private
+Merge stores history, rebase will not store the entire history (commits)
+merge will show files, rebase will not show files
+
+
+====================================
+
+========================
+GIT CLONE -- download remote repo to local
+======================
+
+Now delete the local directory gitproject and clone from GitHub
+
+rm -rf gitproject
+
+git clone https://github.com/sugganabalaji/branching.git
+ls
+cd branching
+git checkout master
+ls
+git checkout dev1branch
+ls
+git checkout dev2branch
+ls
+
+
+
+PLAY with Branches in github
+
+Branch Protection Rules are repository settings in Git platforms like GitHub, Bitbucket that prevent risky or unauthorized changes to important branches (such as main, master, or release). They help ensure that code reaches protected branches only after meeting your team's quality and review requirements.
+
+Why use Branch Protection Rules?
+
+Without protection, anyone with write access could:
+
+Push code directly to main
+Merge code that hasn't been reviewed
+Merge code with failing tests
+Force-push and rewrite commit history
+Accidentally delete the branch
+
+Branch protection helps avoid these situations.
+
+
+| Rule                                   | Recommendation   |
+| -------------------------------------- | ---------------- |
+| Require Pull Request                   | ✅ Yes            |
+| Require approvals                      | 2 reviewers      |
+| Dismiss stale approvals                | ✅ Yes            |
+| Require conversation resolution        | ✅ Yes            |
+| Require status checks                  | ✅ Yes            |
+| Require successful build               | ✅ Yes            |
+| Require unit tests                     | ✅ Yes            |
+| Require code coverage threshold        | Optional         |
+| Require branch up to date before merge | ✅ Yes            |
+| Prevent force push                     | ✅ Yes            |
+| Prevent branch deletion                | ✅ Yes            |
+| Restrict direct push                   | ✅ Yes            |
+| Require signed commits                 | Optional         |
+| Linear history                         | Recommended      |
+| Require merge queue                    | For larger teams |
