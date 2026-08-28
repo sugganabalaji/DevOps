@@ -1,0 +1,414 @@
+Tags help execute only selected tasks.
+
+TAGS: used to execute or skip specific tasks in playbook.
+======================================================
+---
+- name: TAGS Playbook
+  hosts: all
+  tasks:
+    - name: installing git
+      yum: name=git state=present
+      tags: git
+    - name: installing docker
+      yum: name=docker state=present
+      tags: dockerinstall
+    - name: starting docker
+      service: name=docker state=started
+      tags: dockerstart
+    - name: create user
+      user: name=suresh state=present
+      tags: user
+
+SINGLE TAG:ansible-playbook reyaz.yml --tags user
+MULTI TAG: ansible-playbook reyaz.yml --tags dockerinstall,dockerstart
+
+-->  remove all packages now
+
+sed -i 's/present/absent/g' reyaz.yml   or  sed -i 's/present/absent/; s/installing/uninstalling/' reyaz.yml  ---> replace words using sed
+
+
+ansible all -a "yum install git -y"
+
+SKIPPING SINGLE TAG: ansible-playbook reyaz.yml --skip-tags "git"
+
+SKIPPING MULTI TAG: ansible-playbook reyaz.yml --skip-tags "dockerinstall,dockerstart"
+
+Always TAG
+----------
+
+The always tag means the task runs every time, even if you specify other tags.
+
+---
+- hosts: all
+  gather_facts: false
+
+  tasks:
+
+    - name: Display Welcome Message
+      debug:
+        msg: "Welcome to DNA by Reyaz"
+      tags:
+        - always
+
+    - name: Install Apache
+      debug:
+        msg: "Installing Apache"
+      tags:
+        - install
+
+    - name: Install Nginx
+      debug:
+        msg: "Installing Nginx"
+      tags:
+        - nginx
+
+ansible-playbook play.yml --tags install
+
+Notice that the task tagged always runs even though only the install tag was requested.
+
+NEVER Tag
+---------
+The never tag means the task does not run by default.
+
+It only runs when you explicitly request the never tag or another tag assigned to the same task.
+
+
+---
+- hosts: all
+  gather_facts: false
+
+  tasks:
+
+    - name: Install Apache
+      debug:
+        msg: "Installing Apache"
+
+    - name: Delete Everything
+      debug:
+        msg: "Deleting all files..."
+      tags:
+        - never
+
+ansible-playbook play.yml  [Installing Apache, and The dangerous task is skipped.]
+
+ansible-playbook play.yml --tags never [Now it runs because you explicitly requested the never tag.]
+
+Real time: we use this while clean up any infra explicitly
+
+Example with always and never
+----------------------------
+
+---
+- hosts: all
+  gather_facts: false
+
+  tasks:
+
+    - name: Welcome
+      debug:
+        msg: "Welcome"
+      tags:
+        - always
+
+    - name: Install Apache
+      debug:
+        msg: "Installing Apache"
+      tags:
+        - install
+
+    - name: Delete Logs
+      debug:
+        msg: "Deleting Logs"
+      tags:
+        - never
+        - cleanup
+
+
+
+ansible-playbook play.yml  [The cleanup task is skipped because of never.]
+
+
+ansible-playbook play.yml --tags install
+
+ansible-playbook play.yml --tags cleanup
+
+
+===================================
+
+
+VARIBALES: Static variables and Dynamic Variables
+
+============================================
+
+remove all packages first to install again
+
+ansible all -a "yum remove git* maven* httpd* docker* -y"
+
+STATIC VARS: these variables will declared inside playbook.
+it will not change until unless we change.
+
+vi staticvar.yml
+
+---
+- name: STATIC Variable
+  hosts: all
+  vars:
+    a: git
+    b: maven
+  tasks:
+    - name: installing git
+      yum: name={{a}} state=present
+    - name: installing maven
+      yum: name={{b}} state=present
+
+
+ansible-playbook staticvar.yml
+
+---> now uninstall again
+
+sed -i 's/present/absent/g' staticvar.yml
+
+ansible-playbook staticvar.yml
+
+
+DYNAMIC VARS: these variables will declared outside playbook.it will  change frequently as per our requirement.
+------------   --------------------------------------------------------
+
+
+vi dynamicvar.yml
+
+---
+- name: Dynamic Vars
+  hosts: all
+  tasks:
+    - name: installing pkg
+      yum: name={{a}} state=present
+    - name: installing pkg
+      yum: name={{b}} state=present
+
+ansible-playbook dynamicvar.yml --extra-vars "a=git b=maven"
+
+uninstall again
+------
+
+sed -i 's/present/absent/' dynamicvar.yml
+
+ansible-playbook dynamicvar.yml --extra-vars "a=git b=maven"
+
+=====================================
+LOOPS - Reduce the number of lines of code
+====================
+
+Make sure no software are there on workernodes, we will run the commands again
+
+vi loop.yml
+
+---
+- name: Loops playbook
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: installing pkgs
+      yum: name={{item}} state=present
+      with_items:
+        - git
+        - tree
+        - docker
+        - httpd
+        - java-1.8.0-openjdk
+        - maven
+
+ansible-playbook loop.yml
+
+see all packges are installed
+ansible all -a "mvn -v"
+ansible all -a "docker -v"
+
+uninstall
+---------
+
+vi loopuninstall.yml
+
+---
+- name: uninstalling pkgs
+  hosts: all
+  tasks:
+    - name: uninstalling pkgs
+      yum: name="{{item}}" state=absent
+      with_items:
+        - git*
+        - tree*
+        - httpd*
+        - java-1.8.0-openjdk*
+        - maven*
+
+ansible-playbook loopuninstall.yml
+
+ansible all -a "mvn -v"
+ansible all -a "docker -v"
+
+
+creating users - replace yum module with user in playbook
+-------------
+
+vi loopusers.yml
+
+---
+- name: Loops playbook
+  hosts: all
+  tasks:
+    - name: Creating Users
+      user: name="{{item}}" state=present
+      loop:
+        - lucky
+        - imthiaz
+        - siva
+        - rajesh
+        - pavan
+
+ansible-playbook loopusers.yml
+
+ansible all -a "cat /etc/passwd"
+
+remove users
+-----------
+
+vi removeloopusers.yml
+
+---
+- name: uninstall pkgs
+  hosts: all
+  tasks:
+    - name: uninstalling pkgs
+      user: name="{{item}}" state=absent
+      loop:
+        - lucky
+        - imthiaz
+        - siva
+        - rajesh
+        - pavan
+
+ansible-playbook removeloopusers.yml
+
+
+
+Nested Loops
+-------------
+
+A nested loop means one loop runs inside another. It's useful when you want to combine every item from one list with every item from another list.
+
+---
+- name: Nested Loops
+  hosts: all
+  gather_facts: false
+
+  vars:
+    students:
+      - Reyaz
+      - John
+
+    subjects:
+      - Linux
+      - AWS
+
+  tasks:
+
+    - name: Student Subject Combination
+      debug:
+        msg: "{{ item.0 }} learns {{ item.1 }}"
+      loop: "{{ students | product(subjects) | list }}"
+
+
+
+
+The product filter creates all possible combinations.
+
+students: Starts with your first list.
+product(subjects): Pairs every single item from the first list with every single item from the second list.
+list: Converts those paired combinations into a final, clean list format that the loop can read.
+
+Summary
+-------
+students contains Reyaz and John.
+subjects contains Linux and AWS.
+product(subjects) creates every student-subject combination.
+item.0 represents the student.
+item.1 represents the subject.
+The output will be:
+Reyaz learns Linux
+Reyaz learns AWS
+John learns Linux
+John learns AWS
+In short: product() is used to create combinations between two lists.
+
+Output
+------
+Reyaz learns Linux
+Reyaz learns AWS
+John learns Linux
+John learns AWS
+
+Detailed Explanation
+---------------------
+What product() does
+It creates every possible combination of one student with one subject.
+
+Given:
+
+students:
+  - Reyaz
+  - John
+
+subjects:
+  - Linux
+  - AWS
+
+
+the loop produces:
+
+(Reyaz, Linux)
+(Reyaz, AWS)
+(John, Linux)
+(John, AWS)
+
+
+Each item is therefore a two-element list/tuple:
+
+item.0 → student
+item.1 → subject
+
+
+So:
+
+msg: "{{ item.0 }} learns {{ item.1 }}"
+
+
+will output approximately:
+
+Reyaz learns Linux
+Reyaz learns AWS
+John learns Linux
+John learns AWS
+
+
+Why | list is used
+product() returns an iterator. Adding:
+
+| list
+
+
+materializes it into a list that Ansible can iterate over.
+
+Simple way to remember it
+Think of:
+
+students | product(subjects)
+
+
+as:
+
+every student × every subject
+
+With 2 students and 2 subjects:
+
+2 × 2 = 4 combinations.

@@ -1,0 +1,404 @@
+Dictionaries in Ansible
+-------------------------
+
+A dictionary is a collection of key-value pairs. It is similar to a JSON object or a Python dictionary.
+
+Instead of storing just one value:
+
+package: httpd
+
+you can store multiple related values together:
+
+server:
+  name: Web-Server
+  package: httpd
+  port: 80
+
+
+It groups multiple attributes under the main server key. You can reference specific pieces of data (e.g., in a playbook or script) using dot notation, such as server.package to get httpd, or server.port to get 80
+
+
+vi pb.yml
+
+---
+- name: Dictionary Playbook
+  hosts: all
+  gather_facts: false
+
+  vars:
+
+    server:
+      name: Web-Server
+      package: httpd
+      port: 80
+
+  tasks:
+
+    - debug:
+        msg: "{{ server.name }}"
+
+    - debug:
+        msg: "{{ server.package }}"
+
+    - debug:
+        msg: "{{ server.port }}"
+
+
+List of Dictionaries [This playbook to create users in remote machines]
+------------------
+
+---
+- name: List of Dictionaries
+  hosts: all
+  become: yes
+
+  vars:
+
+    users:
+
+      - name: reyaz
+        uid: 1001
+
+      - name: john
+        uid: 1002
+
+      - name: alice
+        uid: 1003
+
+  tasks:
+
+    - name: Create Users
+      user:
+        name: "{{ item.name }}"
+        uid: "{{ item.uid }}"
+        state: present
+
+      loop: "{{ users }}"
+
+
+
+This structure is designed to hold multiple entries. Even though there is only one user (reyaz) in this example, the syntax tells the parser that this is a collection, and you could easily add more users below it with additional hyphens. You would reference this, for example, by looping through users to create multiple system accounts.
+
+
+Nested Dictionaries
+--------------------
+vars:
+
+  employee:
+
+    name: Reyaz
+
+    address:
+
+      city: Hyderabad
+
+      state: Telangana
+
+      country: India
+
+
+{{ employee.name }}
+
+{{ employee.address.city }}
+
+{{ employee.address.country }}
+
+
+
+
+
+
+==============================
+Notify and Handlers:
+===============================
+Handlers are special tasks in Ansible that only run when notified by other tasks. They're perfect for services that need to be restarted or reloaded when configuration changes occur.
+
+one task will depend on another task.
+when task-1 is executed it will ask to run task-2.
+notify is used to tell task-2 to execute.
+
+---> apache should be installed first and then start apache later, so starting service is depending on installation
+--> notify is calling the handler
+
+vi handlers.yml
+
+---
+- name: Handlers
+  hosts: all
+  tasks:
+    - name: installing apache
+      yum: name=httpd state=present
+      notify: starting apache
+
+  handlers:
+    - name: starting apache
+      service: name=httpd state=started
+
+ansible-playbook handlers.yml
+
+--->
+sed -i 's/present/absent/g; s/install/uninstall/g' handlers.yml
+
+or
+
+vi handlersuninstall.yml  ---> httpd will be uninstalled, but there is no service to start , so ignore errors
+
+---
+- name: Handlers uninstall
+  hosts: all
+  tasks:
+    - name: uninstalling apache
+      yum: name=httpd state=absent
+      notify: starting apache
+
+  handlers:
+    - name: starting apache
+      service: name=httpd state=started
+      ignore_errors: yes
+
+
+ansible-playbook handlersuninstall.yml
+
+Another Example
+===============
+---
+- name: Simple Web Server with Handlers (YUM)
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Install Apache web server
+      yum:
+        name: httpd
+        state: present
+      notify: start apache
+
+    - name: Copy simple HTML page
+      copy:
+        content: "<h1>Hello from Ansible Class with YUM!</h1>"
+        dest: /var/www/html/index.html
+      notify: restart apache
+
+  handlers:
+    - name: start apache
+      service:
+        name: httpd
+        state: started
+
+    - name: restart apache
+      service:
+        name: httpd
+        state: restarted
+
+
+
+
+Blocks in Ansible
+----------------
+
+A block groups multiple tasks together so they can share common settings (such as become, when, or tags) and enables exception handling with rescue and always.
+
+Think of it like try-catch-finally in programming languages:
+
+| Programming | Ansible  |
+| ----------- | -------- |
+| try         | `block`  |
+| catch       | `rescue` |
+| finally     | `always` |
+
+
+A block groups related tasks.
+rescue runs only if a task inside the block fails.
+The always section runs whether the block succeeds or fails.
+
+
+Excellent real-world interview/project example demonstrates Handlers + Notify + Block + Rescue + Always together in a single playbook.
+---------------------------------------------------------------------------------------------------
+
+---
+- name: Deploy Nginx Website
+  hosts: all
+  become: yes
+
+  vars:
+    webpage: |
+      <html>
+      <head><title>DNA by Reyaz</title></head>
+      <body>
+        <h1>Welcome to DNA by Reyaz</h1>
+        <h2>Nginx deployed successfully using Ansible!</h2>
+      </body>
+      </html>
+
+  tasks:
+
+    - block:
+
+        - name: Install Nginx
+          dnf:
+            name: nginx
+            state: present
+
+        - name: Deploy index.html
+          copy:
+            content: "{{ webpage }}"
+            dest: /usr/share/nginx/html/index.html
+            owner: root
+            group: root
+            mode: '0644'
+          notify: Restart Nginx
+
+        - name: Start and Enable Nginx
+          service:
+            name: nginx
+            state: started
+            enabled: yes
+
+      rescue:
+
+        - name: Display Failure Message
+          debug:
+            msg: "Deployment failed. Starting rollback..."
+
+        - name: Remove Nginx Package
+          dnf:
+            name: nginx
+            state: absent
+          ignore_errors: yes
+
+        - name: Remove index.html
+          file:
+            path: /usr/share/nginx/html/index.html
+            state: absent
+          ignore_errors: yes
+
+      always:
+
+        - name: Deployment Status
+          debug:
+            msg: "Deployment process completed."
+
+        - name: Collect Nginx Status
+          shell: systemctl status nginx --no-pager
+          register: nginx_status
+          ignore_errors: yes
+
+        - name: Show Service Status
+          debug:
+            var: nginx_status.stdout_lines
+
+  handlers:
+
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted
+
+
+Explanation
+--------------------
+Block
+-----
+Contains the main deployment steps:
+
+Install Nginx
+Copy the application (index.html)
+Start the service
+
+
+notify
+-------
+notify: Restart Nginx
+
+This does not restart Nginx immediately.
+
+It tells Ansible:
+
+"If this task changes something, run the handler at the end of the play."
+
+If index.html hasn't changed, the handler won't run.
+
+handler
+--------
+handlers:
+  - name: Restart Nginx
+    service:
+      name: nginx
+      state: restarted
+
+Handlers run only when notified, preventing unnecessary service restarts.
+
+rescue
+------
+
+Runs only if any task in the block fails.
+
+Typical recovery actions include:
+
+Rollback changes
+Remove partially installed software
+Restore backups
+Send alerts
+
+always
+-------
+Runs regardless of success or failure.
+
+Typical uses:
+
+Collect logs
+Print deployment status
+Send email or Slack notifications
+Cleanup temporary files
+
+============================
+SHELL in Playbook
+========================
+
+We can directly run shell / Linux commands in playbook , use module shell or command or raw module, all are same -->
+
+raw is latest module, raw is commonly used
+
+✅ Use command whenever possible (it's safer).
+✅ Use shell only if needed (for pipes, loops, variables).
+✅ Use raw only for bootstrapping systems without Python.
+
+
+vi shell.yml
+
+
+---
+- name: Shell in Playbook
+  hosts: all
+  tasks:
+    - name: installing apache
+      shell: yum install httpd -y
+
+    - name: installing git
+      command: yum install git -y
+
+    - name: installing maven
+      raw: yum install maven -y
+
+
+ansible-playbook shell.yml
+
+uninstall
+---------
+
+sed -i 's/install/remove' shell.yml
+
+or
+
+vi shellremove.yml
+
+- hosts: all
+  tasks:
+    - name: installing apache
+      shell: yum remove httpd -y
+
+    - name: installing git
+      command: yum remove git -y
+
+    - name: installing maven
+      raw: yum remove maven -y

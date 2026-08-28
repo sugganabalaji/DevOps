@@ -1,0 +1,150 @@
+Ansible
+==========
+
+ANSIBLE:
+Simply It is a IT automation tool
+its a Configuration Management Tool.
+
+Launch Amazon Linux 2023 , t2.micro
+
+Installation, Ansible needs python
+----------------------------------
+
+sudo dnf install ansible -y
+
+sudo dnf install python3 python3-pip -y
+
+ansible --version
+
+Examples: Adhoc Commands
+------------------------
+1. ADHOC COMMANDS:
+-----------------
+these are simple Linux commands.
+ADHOC commands  are great for tasks you repeat daily
+These are used for temp works.
+
+-a = argument
+
+
+
+ansible localhost -a "yum install git -y"
+ansible localhost -a "git --version"
+ansible localhost -a "yum install maven -y"
+ansible localhost -a "mvn --version"
+ansible localhost -a "touch file1"
+
+ansible localhost -a "ls"
+
+ansible localhost -a "yum install httpd -y"
+
+ansible localhost -a "systemctl status httpd"
+
+ansible localhost -a "systemctl start httpd"
+
+ansible localhost -a "useradd reyaz"
+
+ansible localhost -a "cat /etc/passwd"
+
+ansible localhost -a "yum remove git* maven* httpd* -y"
+
+ansible -m ping localhost    [Ping localhost]
+
+
+SETUP:
+======
+
+CREATE 5 SERVERS - Amazon Linux 2023 [1=ANSIBLE Master, 2=PROD, 2=DEV]
+
+EXECUTE THE BELOW COMMANDS ON ALL SERVERS:
+sudo -i
+hostnamectl set-hostname ansible/prod-1/prod-2/dev-1/dev-2
+sudo -i
+
+Now Root user from ansible server needs to login to all servers using root username and password
+
+Do below commands in all servers using multi-exec
+
+## first set the password for root
+passwd root
+
+set new password: reyaz123456
+
+## enable all server to login as root
+
+vi /etc/ssh/sshd_config (40 & 65 uncomment both lines)  [65: passwordauthentication yes  40: PermitR ootLogin yes]
+systemctl restart sshd
+systemctl status sshd
+hostname -i  -- to see the private ip
+
+Go to Ansible Master
+--------------------
+Lets Generate SSH Keys, using this KEY Ansible server will communicate with worker nodes
+
+ssh-keygen
+
+ll .ssh
+
+
+ssh-copy-id root@private ip of prod-1 -- > yes -- > password -- > ssh private ip -- > ctrl d
+ssh-copy-id root@private ip of prod-2 -- > yes -- > password -- > ssh private ip -- > ctrl d
+ssh-copy-id root@private ip of dev-1 -- > yes -- > password -- > ssh private ip -- > ctrl d
+ssh-copy-id root@private ip of dev-2 -- > yes -- > password -- > ssh private ip -- > ctrl d
+
+just to see the connection
+
+ssh privateip
+
+
+Inventory file
+=============
+
+There are 2 types of inventory file, static and Dynamic
+
+vi /etc/ansible/hosts
+# Ex 1: Ungrouped hosts, specify before any group headers.
+[prod]
+172.31.20.40
+172.31.21.25
+[dev]
+172.31.31.77
+172.31.22.114
+
+
+Another method for authentication
+---------------------------------
+In host file create variables
+
+[all:var]
+ansible_user=ec2-user
+ansible_ssh_private_key_file=/home/ec2-user/MyKey.pem
+
+-----------------------------------------------------
+
+
+ansible-inventory --list   --> This will show the inventory list
+
+ansible -m ping all : To check worker node connection with ansible server.
+
+1. ADHOC COMMANDS:
+-----------------
+these are simple Linux commands.
+ADHOC commands  are great for tasks you repeat daily
+These are used for temp works.
+
+-a = argument
+
+ansible all -a "yum update -y"
+ansible all -a "yum install git -y"
+ansible all -a "git --version"
+ansible all -a "yum install maven -y"
+ansible all -a "mvn --version"
+ansible all -a "touch file1"
+ansible all -a "touch reyaz.txt"
+ansible all -a "ls"
+ansible all -a "yum install httpd -y"
+ansible all -a "systemctl status httpd"
+ansible all -a "systemctl start httpd"
+ansible all -a "user add reyaz"
+ansible all -a "cat /etc/passwd"
+ansible all -a "yum remove git* maven* httpd* -y"
