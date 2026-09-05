@@ -64,34 +64,69 @@ Java: Java 11 / 17 / 21
 Default path : /var/lib/jenkins
 
 ===========================
-Alternatives : GO CI, Circle CI, Tarvis, Semaphore, Buddy Build Master, Gitlab, Harness, argoCD
+Alternatives : Bamboo, GO CI, Circle CI, Tarvis, Semaphore, Buddy Build Master, Gitlab, Harness, argoCD
 
 CLOUD : AWS CodePipeline, Azure Pipeline
 
 ==================================
 
 
-SETUP : Launch EC2 instance Amazon Linux 2023
---------------------------------------------
+SETUP : Launch EC2 instance Amazon Linux 2023 Kernel-6.1 AMI [Bigger instance type and with 20GB]
+------------------------------------------------------------
 
 In SG, allow protocols, 8080, 80 http
 
-To setup Jenkins, we need to take code from git , build using maven , that's the reason we install below all
+$ sudo -s
+# hostnamectl set-hostname jenkins
+# sudo -i
+# clear
 
-SETUP : Launch EC2 instance Amazon Linux 2023 [Bigger instance type and with 20GB]
---------------------------------------------
+To set up Jenkins, we need to take code from git , build using maven , that's the reason we install below all
 
-Fork my devopsscripts repo and copy jenkins.sh
-
+Fork my https://github.com/ReyazShaik/devopsscripts
+Named as devops-scripts repo and copy jenkins.sh
 
 vi jenkins.sh
+press i
 paste the script
+press esc
+:wq! enter
 
 sh jenkins.sh
 
-For logs:
+press q
 
+Browser: IP:8080
+
+Unlock Jenkins: cat /var/lib/jenkins/secrets/initialAdminPassword
+741cd2cfc08a4b56ab8092ec8d30bf6e
+
+Customize Jenkins > Install Suggested Plugins
+
+Create First Admin User:
+Username: balaji
+Password: balaji
+Confirm password: balaji
+Full name: balaji
+Email: bsuggana@gmail.com
+Save & Continue
+
+copy Jenkins URL
+Save and finish
+start using jenkins
+
+Congratulations!
+
+For logs:
 journalctl -u jenkins
+q
+
+Don't stop & start EC2 Instance, Recommended to Terminate for Practice.
+If you Stop & Starts, Public ip will be changed.
+In Jenkins, It points to Previous Public Ip
+We needs to change in:
+Manage Jenkins > System Configuration > System:
+Jenkins Location > Jenkins URL > Change latest EC2 instance Public IP > Save > Apply.
 
 
 ========================================================
@@ -104,7 +139,7 @@ Example 1: Firstjob - Execute shell
 CREATING A JOB:
 ---------------
 New item -- > Name -- > Free Style -- > Ok
-Description --> THis is my first job
+Description --> This is my first job
 Build Steps --> Execute Shell --> echo "Welcome to Jenkins" --> Save
 Build Now
 
@@ -112,13 +147,17 @@ Build Now
 
 Run the build
 
-see in Jenkins server --> cd /tmp/  [What ever we create in pipeline, all files will be stored in jenkins server]
+see in Jenkins server --> cd /tmp/  [Whatever we create in pipeline, all files will be stored in jenkins server]
+first-job.txt
 
 --> lets create a small bash script
 
-    vi     basic.sh
+    vi basic.sh
+    press i
     #!/bin/bash
     echo "This is sample script under tmp"
+    esc
+    :wq!
 
 sh basic.sh
 
@@ -126,34 +165,34 @@ Edit the job and modify the script . If you want to run any script which is ther
 
 echo "Welcome to Jenkins" > /tmp/first-job.txt
 bash /tmp/basic.sh
+sh /tmp/basic.sh
 
 Run the Build and see Output
 
 Build with Parameters
 ------------------
-
-Edit the Job --> THis Project is Parameterized
+Edit the Job --> This Project is Parameterized
 Example --> Select --> String Parameter
-Name = FirstName
-Default Value = Reyaz
+Name = firstName
+Default Value = Balaji
 
 One more
 
 Select --> String Parameter
-Name = LastName
-Default Value = Shaik
+Name = lastName
+Default Value = Suggana
 
 
-Nows lets use these parameters in script
+Now lets use these parameters in script
 
-echo "I am" $FirstName $LastName
+echo "I am" $firstName, $lastName
 echo "Welcome to Jenkins"
 echo "Welcome to Jenkins" > /tmp/first-job.txt
 bash /tmp/basic.sh
 
 Run the Build
 
-By default, you get Reyaz shaik, but you can override it with other string/name
+By default, you get Balaji, Suggana, but you can override it with other string/name
 
 see the output
 
@@ -161,15 +200,16 @@ see the output
 Another Example:  Lets add choice parameter: Edit the Build Job
 -----------------
 --> This Project is Parameterized --> Add Parameter --> choice Parameter
-Name: Gender
+Name: gender
 Choices:
 MALE
 FEMALE
 OTHER
 
-Edit the Script and add $Gender
+Edit the Script and add $gender
 
-echo $FirstName $LastName $Gender
+echo "My name is $firstName, $lastName"
+echo "I am a $gender"
 echo "Welcome to Jenkins"
 echo "Welcome to Jenkins" > /tmp/first-job.txt
 bash /tmp/basic.sh
@@ -177,57 +217,69 @@ bash /tmp/basic.sh
 Another Example: Lets add choice Parameter : Edit the Build Job
 -----------------
 --> This Project is Parameterized --> Add Parameter --> choice Parameter
-Name: ENV
+Name: env
 Choices:
-Production
-Development
+DEV
+Testing
+PROD
 
-echo "I am" $FirstName $LastName $Gender
-echo "Welcome to Jenkins Pipeline by Reyaz" > /tmp/first-job.txt
+echo "I am" $firstName $lastName $gender
+echo "Welcome to Jenkins Pipeline by Balaji" > /tmp/first-job.txt
 bash /tmp/basic.sh
-echo "Deploying to environment: $ENV"
-if [ "$ENV" = "Production" ]; then
+echo "Deploying to environment: $env"
+
+if [ "$env" = "DEV" ]; then
+  echo "Cool: You are deploying to Development!"
+elif [ "$env" = "PROD" ]; then
   echo "Warning: You are deploying to Production!"
 else
    echo "Deploying to $ENV Environment."
 fi
 
 
-
 Scheduling the job
-----------------
-
+------------------
 If you want to run the job based on schedule, we can use Build Periodically option
 
 Create a new free style job --> Name = cron-job
 
-Description --> THis is scheduled job
-Build Periodically --> *****  -- every min  */5 * * * *  -- Every 5 mins
+Description --> This is scheduled job
+Build Periodically -->
+*****  -- every min
+*/5 * * * *  -- Every 5 mins
 
 search in google -- cronjob generator -- https://crontab.cronhub.io/
+Refer: https://crontab.guru/
 
-Build Steps --> Execute Shell --> echo "Welcome to Jenkins" --> Save
+check date on mobaXterm
+[root@jenkins tmp]# date
+Sat Sep  5 12:04:00 UTC 2026 - Saturday
+4 12 5 9 6 -- “At 12:04 on day-of-month 5 and on Saturday in September.”
+
+Build Steps --> Execute Shell -->
+echo "Welcome To Jenkins"
+echo "Current date and time:" date
+--> Save
 
 Build Now
 
-This job will build every min
-
+This job will build every 5 min
 
 
 CREATING A JOB : Integration with GitHub
 ----------------------------------------
-
 Note: To integrate any tool, we need to install plugins first.
 
 Check if git plugins are available, if available, no need to install. If not, install plugins
 
 Example 1 : Simple, Lets get source code to Jenkins
 -------------------------------------------
-New item -- > GetCodefromGit -- > Free Style -- > Ok --> source code management --> GIT
+New item -- > GetCodefromGit -- > Free Style -- > Ok --> source code management --> Git Radio button
 
 --> Repo URL(take sample project repo) https://github.com/ReyazShaik/website.git
+Or use this branch https://github.com/sugganabalaji/website.git
 
---> Branch : master , keep default or change
+--> Branch : */master , keep default or change
 
 Run the Build
 
@@ -243,11 +295,13 @@ cd GetCodefromGit
 
 Example 2:
 ----------
-New item -- > Name -- > Free Style -- > Ok --> source code management
+New item -- > github-mvn-integration-job -- > Free Style -- > Ok --> source code management > Git
 
 --> Repo URL(take sample maven project repo) https://github.com/ReyazShaik/java-project-maven-new.git
 
 or take sample maven project https://github.com/jenkins-docs/simple-java-maven-app.git
+
+or forked https://github.com/sugganabalaji/java-project-maven-new.git
 
 --> Branch : master , keep default or change
 
@@ -257,33 +311,59 @@ If fails: In general, GitHub uses main branch instead master --> in job replace 
 
 GO to Jenkins Linux machine
 
---> cd /var/lib/Jenkins/workspace/Firstjob/target/
+--> cd /var/lib/Jenkins/workspace/github-mvn-integration-job/target/
 
 ls --> war file will be here
 
 
-Example 2: Secondjob
+Example 3: Thirdjob
 ----------
-New item -- > Name -- > Free Style -- > Ok --> source code management
+New item -- > Thirdjob -- > Free Style -- > Ok --> source code management
 
 --> Repo URL(take sample maven project repo) https://github.com/ReyazShaik/java-project-maven-new.git
 
 --> Branch : master , keep default or change
 
---> Build step --> Invoke top-level Maven targets --> just clean package (no need to give mvn)
+--> Build step --> Invoke top-level Maven targets --> clean package (no need to give mvn)
 
 --> Build Now
 
 GO to Jenkins Linux machine
 
---> cd /var/lib/Jenkins/workspace/Firstjob/target/
+--> cd /var/lib/Jenkins/workspace/Thirdjob/target/
 
-ls --> war file will be here
+ls --> .war file will be here
 
 
 Now, change the file in GitHub --> index.html or pom.xml and build now
 
 Every time developer do changes he will do build --> this is called continuous integration
+
+Delete Job
+==========
+Click on Jenkins
+Click on Job That you want to Delete Job1.
+Delete Project. > Yes
+Job Deleted. It can't be undone.
+But in workspace, project will be available.
+pwd
+/var/lib/jenkins/workspace/
+ls
+Job1
+
+Jenkin doesn't how to Restore a Job
+So we have Plugin to Restore a Deleted Job.
+Plugin: Job Configuration History.
+
+Manage Jenkins > Plugins > Available Plugins > Check - Job Configuration History > Install > scroll to bottom > check - Restart Jenkins
+Login
+Observe new 3 bars icon on top right corner before profile icon > Job Config History
+Earlier it was not there
+
+Create a new Job6 > Build Now >and  Delete Project
+Click on Job Config History Icon[Top right corner] > show deleted jobs only > find job name deleted > click on Restore Project << button
+ > Yes
+ Click on Jenkins Icon > find restored Job > Again your can Build Job.
 
 Email Notification
 ==================
@@ -292,19 +372,21 @@ If build fails, we should get notifications
 
 Manage Jenkins --> System --> Email Notification
 
+Bottom of the page
 SMTP server = smtp.gmail.com
 Default user e-mail suffix= @jenkinstest.com
-Use SMTP Authentication = Username = bbbbbb@gmail.com
-For password = Go to browser --> gmail profile--> Manage your Google Account --> Security --> Turn ON 2-steps authentication -->  On Top --> Search for App Password --> App name --> Jenkins --> Create --> Copy code -->
-miqx ynqp dprc qgpt --> Done
+Advanced>
+check > Use SMTP Authentication = Username = your@gmail.com
+For password = Go to browser --> gmail profile--> Manage your Google Account --> Security & Sign-in--> Turn ON 2-steps authentication -->  On Top --> Search box --> type App Password --> App name -- Jenkins --> Create --> Copy code -->
+srtv pypq zlny yigk --> Done
                   copy the code and paste in password section
 
 
 Use SSL
 SMTP Port = 465
-Test configuration by sending test e-mail = bbbbb@gmail.com = Test Configuration
+Test configuration by sending test e-mail = your@gmail.com = Test Configuration
 
-Edit the job --> Configuration --> Post-build Actions --> Recipients = bbbb@gmail.com
-And Fail the job to get email
+Edit the job --> Configuration --> Post-build Actions --> add --> E-mail notification--> Recipients = your@gmail.com
 
+And Fail the job > Get email
 ===============
