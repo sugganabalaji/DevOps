@@ -4,65 +4,71 @@ Project on FreeStyle Job - Deployment on Tomcat
 
 CODE --> BUILD --> TEST --> ARTIFACT --> Deployment
 
-1 Server Jenkins
-Another server for Tomcat
+1 Server Jenkins - Amazon Linux 2023 - c7i-flex.large - 20GB
+Another server for Tomcat - t3.micro
 
-Now lets deploy our application war file on tomcat
+Now let's deploy our application war file on tomcat
 
 Launch Amazon Linux 2023 instance and install tomcat manually ---
 
 
-Tomcat Setup
-============
+Tomcat Server Setup:
+====================
 
 Launch amazon Linux 2023 and install tomcat manually first and then automatically using script
 
-All apache software are available in http://dlcdn.apache.org --> tomcat --> tomcat-11--> v11.0.24--> bin--> apache-tomcat-11.0.24.tar.gz
+All Apache software are available (in Browser) http://dlcdn.apache.org --> tomcat --> tomcat-11--> v11.0.25--> bin--> apache-tomcat-11.0.25.tar.gz
 
 Step1: install java
 -------------------
-dnf install java-21-amazon-corretto -y
+# dnf install java-21-amazon-corretto -y
 
 Step 2: download tomcat
 ----------------------
-yum install -y wget
-
-wget https://dlcdn.apache.org/tomcat/tomcat-11/v11.0.24/bin/apache-tomcat-11.0.24.tar.gz
+# yum install wget -y ==> the 'wget' package (used for downloading files from the web).
+# wget https://dlcdn.apache.org/tomcat/tomcat-11/v11.0.25/bin/apache-tomcat-11.0.25.tar.gz
+# ls
 
 Step3: Extract
 --------------
-tar -zxvf apache-tomcat-11.0.22.tar.gz
+tar -zxvf apache-tomcat-11.0.25.tar.gz
 
 Step4: Configure user, passwords and roles
 -------------------------------------------
- --> cd apache-tomcat-11.0.22/conf/
- --> vi tomcat-users.xml
-     Add new files --> copy 3 lines and paste, line 56
+# cd apache-tomcat-11.0.25/conf/
+# vi tomcat-users.xml
+  Add bew 3 new lines --> copy 3 lines and paste, line 56
      <role rolename="manager-gui"/>
      <role rolename="manager-script"/>
      <user username="tomcat" password="root123" roles="manager-gui,manager-script"/>
 
 Step 5: Delete line 21 and 22 -- if not delete, we need to give public ip
 ------------------------------
-  --> cd apache-tomcat-11.0.22/webapps/manager/META-INF
-  --> vi context.xml
-       :22
+In tomcat, under webapps directory, we will place MyApp.war file. It will means, we deployed MyApp.war to Tomcat server.
+
+  # cd apache-tomcat-11.0.25/webapps/manager/META-INF
+  # vi context.xml
+       :21
+    -- delete 21 and 22 lines (Valve element)
+    dd
+    dd
 
 Step 6: Start Tomcat
 --------------------
+  --> cd ../../..
   --> cd apache-tomcat-10.1.42/bin
   --> sh startup.sh
 
 Connection
 =========
-http://IP:8080
-manager apps --> username: tomcat, password: root123
+http://PublicIP:8080
+manager apps --> username: tomcat, password: root123456
 
 
 ================================================
 
-For Script
-----------
+For Tomcat install Script
+--------------------------
 
 vi tomcat.sh
 
@@ -82,26 +88,30 @@ sh apache-tomcat-10.1.33/bin/startup.sh
 sed -i 's/91/93/g' tomcat.sh   --- Change above script based on version. https://dlcdn.apache.org/tomcat/
 
 Install Plugin
--------------
+--------------
 In Jenkins server first install a plugin(Deploy to container) to integrate with Tomcat
 
 Create a Job
 ------------
 
---> Create a New item --> Free Style --> Source Code Management --> GIT --> https://github.com/ReyazShaik/java-project-maven-new.git
+--> Create a New item --> DeployTomcatJob --> Free Style --> Source Code Management --> GIT --> https://github.com/sugganabalaji/java-project-maven-new.git
 
 --> Build Steps --> Invoke top level maven target --> clean package
 
 --> Post Build actions -->
- Deploy war/ear to a container --> **/*.war
+ Deploy war/ear to a container
+    --> /var/lib/jenkins/workspace/DeployToTomcatJob/target/myapp.war
+    OR
+    --> **/*.war
  Context path = mywebapp
---> Add container --> Select tomcat 9 --> credentials --> Add Jenkins --> username=tomcat, password= root123, ID = tomcatcred
-    --> tomcat url = http://35.154.10.118:8080/ (ec2 url)
+--> Add container --> Select Tomcat 9.x Remote --> Credentials --> Add --> Global --> Username with password --> Next --> username=tomcat, password= root123456, ID = tomcatcreds, Description = tomcatcreds
+    --> Tomcat URL = http://13.201.30.96:8080/ (Tomcat ec2 public url) --> Save
 
 --> Build Now
 
 --> Go to tomcat page , refresh /mywebapp
 
+--> http://13.201.30.96:8080/mywebapp/
 
 Now Store the Artifacts to S3
 ================================
@@ -118,9 +128,16 @@ Go to your Jenkins Job → Configure -->
  --> Post-build Actions.
  → Select "Publish artifacts to S3 bucket".
  --> Source = **/*.war
- --> Destination Bucket = jen-test-me-reyaz/
+ --> Destination Bucket = hotstar-artifacts-bkt/
  --> Bucket Region = ap-south-1
 
+Save
+
+Build Now
+
+verify in S3, />target>myapp.war uploaded, if versioning enabled in s3, How many times Jenkins job build triggered That many s3 war versions will creates.
+
+Open Tomcat and verify Application up and running.
 
 
 TERMINATE EC2 instances [jenkins and Tomcat] and create fresh Jenkins and  Tomcat.
@@ -137,13 +154,13 @@ Types : Scripted and Declarative(commonly used)
 
 Scripted   ||   Declarative
 ===========================
-SHORT        LONG
-NO Stages    Stages
-Start Node    Start with pipeline
+SHORT          LONG
+NO Stages      Stages
+Start Node     Start with pipeline
 
 
 Pipeline Syntax
-==============
+===============
 
 To write the pipeline we use DSL (Domain specific Language)
 
@@ -153,15 +170,15 @@ It consists of blocks that includes stages : stages are stage1 = code , stage2 =
 it includes () & {}
 
 
-Create a job -- select Pipeline --> under script --> use below or --> try sample pipeline and explain
+Create a job --> jenkins-pipeline --> select Pipeline --> under script --> use below or --> try sample pipeline and explain
 
-short cut to remember how to create a pipeline :
+shortcut to remember how to create a pipeline :
 PASSS -  PAS3
-Pipeline,
-Agent,
-Stages,
-Stage ,
-Steps
+P - Pipeline,
+A - Agent,
+S - Stages,
+S - Stage ,
+S - Steps
 
 Below pipeline has one stage
 
@@ -177,7 +194,7 @@ pipeline {
     }
 }
 
---> now, file1 is created at cd /var/lib/jenkins/workspace/
+--> now, file1 is created at cd /var/lib/jenkins/workspace/jenkins-pipeline/
 
 =============
 BLUE OCEAN
@@ -191,10 +208,11 @@ Can have single stage or multi stage, depend upon requirement
 
 pipeline {
     agent any
+
     stages {
         stage('one'){
             steps {
-                sh 'touch file1'
+                sh 'touch file2'
             }
         }
         stage('two'){
@@ -204,13 +222,14 @@ pipeline {
         }
         stage('three'){
             steps{
+                // df -h → Displays disk usage in human‑readable format (GB/MB instead of raw blocks).
                 sh 'df -h'
             }
         }
     }
 }
 
-For syntax, click on pipeline syntax and select git (in git master branch should be there), give info and generate sntax
+For syntax, click on pipeline syntax and select git (in git master branch should be there), give info and generate syntax
 
 if you need master branch in git
 
@@ -228,6 +247,7 @@ CODE --> BUILD --> TEST -->Code Review --> ARTIFACT --> Deployment
 
 pipeline {
     agent any
+
     stages {
         stage('Clone Git Repo') {
             steps {
@@ -265,18 +285,16 @@ pipeline {
 
 
 
-
-pipeline {
-    agent any
 ======================
 
 
 pipeline {
     agent any
+
     stages {
         stage('checkout') {
             steps {
-                git 'https://github.com/ReyazShaik/java-project-maven-new.git&#39;
+                git 'https://github.com/sugganabalaji/java-project-maven-new.git'
             }
         }
         stage('compile') {
@@ -309,13 +327,15 @@ Pipeline as a Code - Running more than one command inside a single stage (Advant
 
 pipeline {
     agent any
+
     stages {
         stage('one') {
             steps {
                 git 'https://github.com/ReyazShaik/java-project-maven-new.git&#39;
-        sh 'mvn compile'
-        sh 'mvn test'
-        sh 'mvn package'
+
+                sh 'mvn compile'
+                sh 'mvn test'
+                sh 'mvn package'
             }
         }
 
@@ -335,14 +355,15 @@ pipeline {
         stage('one') {
             steps {
                 git 'https://github.com/ReyazShaik/java-project-maven.git&#39;
-        sh 'mvn compile'
+
+                sh 'mvn compile'
             }
         }
 
         stage('two') {
             steps {
                 sh 'mvn test'
-        sh 'mvn package'
+                sh 'mvn package'
             }
         }
 
@@ -359,11 +380,12 @@ pipeline {
         stage('checkout') {
             steps {
                 git 'https://github.com/ReyazShaik/java-project-maven-new.git&#39;
-        sh '''
-        mvn compile
-        mvn test
-        mvn clean package
-        '''
+
+                sh '''
+                mvn compile
+                mvn test
+                mvn clean package
+                '''
             }
         }
     }
@@ -376,25 +398,29 @@ Integrate Tomcat
 
 Launch a new Amazon Linux 2023 t3.micro instance
 
-vi tomcat.sh
+# vi tomcat.sh
+press i
 
 dnf install java-21-amazon-corretto -y
-wget https://dlcdn.apache.org/tomcat/tomcat-11/v11.0.14/bin/apache-tomcat-11.0.14.tar.gz
-tar -zxvf apache-tomcat-11.0.14.tar.gz
-sed -i '56  a\<role rolename="manager-gui"/>' apache-tomcat-11.0.14/conf/tomcat-users.xml
-sed -i '57  a\<role rolename="manager-script"/>' apache-tomcat-11.0.14/conf/tomcat-users.xml
-sed -i '58  a\<user username="tomcat" password="root123456" roles="manager-gui, manager-script"/>' apache-tomcat-11.0.14/conf/tomcat-users.xml
-sed -i '59  a\</tomcat-users>' apache-tomcat-11.0.14/conf/tomcat-users.xml
-sed -i '56d' apache-tomcat-11.0.14/conf/tomcat-users.xml
-sed -i '21d' apache-tomcat-11.0.14/webapps/manager/META-INF/context.xml
-sed -i '22d' apache-tomcat-11.0.14/webapps/manager/META-INF/context.xml
-sh apache-tomcat-11.0.14/bin/startup.sh
+wget https://dlcdn.apache.org/tomcat/tomcat-11/v11.0.25/bin/apache-tomcat-11.0.25.tar.gz
+tar -zxvf apache-tomcat-11.0.25.tar.gz
+sed -i '56  a\<role rolename="manager-gui"/>' apache-tomcat-11.0.25/conf/tomcat-users.xml
+sed -i '57  a\<role rolename="manager-script"/>' apache-tomcat-11.0.25/conf/tomcat-users.xml
+sed -i '58  a\<user username="tomcat" password="root123456" roles="manager-gui, manager-script"/>' apache-tomcat-11.0.25/conf/tomcat-users.xml
+sed -i '59  a\</tomcat-users>' apache-tomcat-11.0.25/conf/tomcat-users.xml
+sed -i '56d' apache-tomcat-11.0.25/conf/tomcat-users.xml
+sed -i '21d' apache-tomcat-11.0.25/webapps/manager/META-INF/context.xml
+sed -i '22d' apache-tomcat-11.0.25/webapps/manager/META-INF/context.xml
+sh apache-tomcat-11.0.25/bin/startup.sh
 
-sh tomcat.sh
+press esc
+type :wq! enter
+
+#sh tomcat.sh
 
 To replace the tomcat version in the file automatically
 
-sed -i 's/11.0.10/11.0.14/g' tomcat.sh
+sed -i 's/11.0.14/11.0.25/g' tomcat.sh
 
 Go to Jenkins
 --------------
@@ -407,13 +433,13 @@ Manage Jenkins --> Credentials --> System --> Global credentials (unrestricted) 
 Create a new Pipeline
 
 Open Pipeline Syntax
--------------------
-select deploy:Deploy war/ear to a container
+--------------------
+select = deploy:Deploy war/ear to a container
 WAR/EAR files = **/*.war
 Context path = myapp
-Add container --> select tomcat 9
+Add container --> select Tomcat 9.x Remote
 credentials = tomcatcreds
-Tomcat URL = http://13.126.17.44:8080/
+Browser Tomcat URL = http://13.126.17.44:8080/
 
 Generate
 
@@ -422,7 +448,7 @@ pipeline {
     stages {
         stage('checkout') {
             steps {
-                git 'https://github.com/ReyazShaik/java-project-maven-new.git&#39;
+                git 'https://github.com/sugganabalaji/java-project-maven-new.git'
             }
         }
         stage('compile') {
@@ -442,7 +468,7 @@ pipeline {
         }
         stage('deploy') {
             steps {
-                deploy adapters: [tomcat9(credentialsId: 'tomcatcreds', path: '', url: 'http://13.126.17.44:8080/&#39;)], contextPath: 'myapp', war: '**/*.war'
+                deploy adapters: [tomcat9(alternativeDeploymentContext: '', credentialsId: 'TomcatCredentials', path: '', url: 'http://52.66.205.173:8080/')], contextPath: 'application', war: '**/*.war'
             }
         }
 
@@ -486,7 +512,7 @@ pipeline {
     stages {
         stage('checkout') {
             steps {
-                git 'https://github.com/ReyazShaik/java-project-maven-new.git&#39;
+                git 'https://github.com/sugganabalaji/java-project-maven-new.git'
             }
         }
         stage('compile') {
@@ -506,7 +532,7 @@ pipeline {
         }
         stage('Upload to S3') {
             steps {
-                s3Upload consoleLogLevel: 'INFO', dontSetBuildResultOnFailure: false, dontWaitForConcurrentBuildCompletion: false, entries: [[bucket: 'jenkins-artifacts-demo-test', excludedFile: '', flatten: false, gzipFiles: false, keepForever: false, managedArtifacts: false, noUploadOnFailure: false, selectedRegion: 'ap-south-1', showDirectlyInBrowser: false, sourceFile: '**/*.war', storageClass: 'STANDARD', uploadFromSlave: false, useServerSideEncryption: false]], pluginFailureResultConstraint: 'FAILURE', profileName: 's3creds', userMetadata: []
+                s3Upload consoleLogLevel: 'INFO', dontSetBuildResultOnFailure: false, dontWaitForConcurrentBuildCompletion: false, entries: [[bucket: 'hotstar-jenkins-artifacts', excludedFile: '', flatten: false, gzipFiles: false, keepForever: false, managedArtifacts: false, noUploadOnFailure: false, selectedRegion: 'ap-south-1', showDirectlyInBrowser: false, sourceFile: '**/*.war', storageClass: 'STANDARD', uploadFromSlave: false, useServerSideEncryption: false]], pluginFailureResultConstraint: 'FAILURE', profileName: 's3creds', userMetadata: []
             }
         }
         stage('deploy') {
@@ -514,7 +540,7 @@ pipeline {
                 message "is your inputs correct ?"
                 ok "yes"
             steps {
-                deploy adapters: [tomcat9(credentialsId: 'tomcatcreds', path: '', url: 'http://13.126.17.44:8080/&#39;)], contextPath: 'myapp', war: '**/*.war'
+                deploy adapters: [tomcat9(credentialsId: 'tomcatcreds', path: '', url: 'http://13.126.17.44:8080/')], contextPath: 'myapp', war: '**/*.war'
             }
         }
 
@@ -530,6 +556,6 @@ S3 Code
 
         stage('Upload to S3') {
             steps {
-                s3Upload consoleLogLevel: 'INFO', dontSetBuildResultOnFailure: false, dontWaitForConcurrentBuildCompletion: false, entries: [[bucket: 'jenkins-artifacts-demo-test', excludedFile: '', flatten: false, gzipFiles: false, keepForever: false, managedArtifacts: false, noUploadOnFailure: false, selectedRegion: 'ap-south-1', showDirectlyInBrowser: false, sourceFile: '**/*.war', storageClass: 'STANDARD', uploadFromSlave: false, useServerSideEncryption: false]], pluginFailureResultConstraint: 'FAILURE', profileName: 's3creds', userMetadata: []
+                s3Upload consoleLogLevel: 'INFO', dontSetBuildResultOnFailure: false, dontWaitForConcurrentBuildCompletion: false, entries: [[bucket: 'hotstar-jenkins-artifacts', excludedFile: '', flatten: false, gzipFiles: false, keepForever: false, managedArtifacts: false, noUploadOnFailure: false, selectedRegion: 'ap-south-1', showDirectlyInBrowser: false, sourceFile: '**/*.war', storageClass: 'STANDARD', uploadFromSlave: false, useServerSideEncryption: false]], pluginFailureResultConstraint: 'FAILURE', profileName: 's3creds', userMetadata: []
             }
         }
