@@ -1,0 +1,406 @@
+Monolithic and Microservices architecture
+
+Take amazon.in application, it has different services (Amazon Fresh, TV, Prime, AWS.. )
+
+(or)
+
+Take a Bank, example HDFC bank, it has Internet Baking, Mobile Banking, Insurances, Loans etc
+
+Diff between Physical, VM and Container
+
+
+Container
+=========
+Same as VM's
+Container don't have OS
+OS will be on images
+Server = AMI, Container = IMAGE
+Its free
+container is a bundle of packages, it uses Base OS for resources
+
+To create Container, we use a software called Docker
+
+Definitions:
+-------------
+Docker: is OpenSource platform for Developing, Shipping and Running Applications inside the Container.
+Container: is a lightweight isolated environment, that packages the application and its dependencies.
+Containerization: is the way of packaging an application and it's dependencies/configurations.
+That apps are Containerized applications.
+
+
+DOCKER
+=====
+
+Docker alternatives in market - Rocket , ContainerD, Podman, CRIO
+
+It's a free and OpenSource
+It is a platform independent
+IT is used to create, run and deploy applications on containers
+IT is introduced in 2013, written in GO (Google Official ) Language
+We use YAML in dockers
+Docker uses host resources (CPU, memory , etc)
+Docker is majorly used in Linux, but runs on Windows also
+
+Example, Before docker, software/application depends upon so many dependencies, and application fails because there is no required dependencies
+Now, with containerization everything as a packages including dependencies
+
+Ex: Get everything in one place, instead getting different things in different places
+jenkins needs java
+AWS CLI needs python
+Tomcat needs java
+
+
+Containerization: its a OS level Virtualization
+==============================================
+
+Process of packing an application withs its dependencies
+
+DOCKER COMPONENTS:
+-----------------
+DOCKER CLIENT: it interacts with us (command -- > execute -- > output)
+
+ DOCKER HOST: Where we install docker (EC2, Laptop, Vm)
+
+DOCKER DAEMON: manages all docker components (Containers, Images, Volume)
+
+DOCKER REGISTRY: it manages all the docker images.
+
+=============================================================================
+
+
+                    Docker Architecture
+
+                  +----------------------+
+                  |    Docker Client     |
+                  | (docker commands)    |
+                  +----------+-----------+
+                             |
+                    Docker REST API
+                             |
+                             ▼
+                  +----------------------+
+                  |    Docker Daemon     |
+                  |      (dockerd)       |
+                  +----------+-----------+
+                             |
+        -----------------------------------------------
+        |                  |                |          |
+        ▼                  ▼                ▼          ▼
+   Docker Images     Docker Containers   Networks   Volumes
+                             |
+                             ▼
+                      Linux Kernel
+                  (Namespaces + Cgroups)
+
+
+The Docker Client is where users interact with Docker. The command does not create a container itself. Instead, It sends a request to the Docker Daemon.
+
+The Docker Daemon (dockerd) is the main Docker service. It receives requests from the client. It is responsible for
+
+Pulling Images
+Building Images
+Running Containers
+Stopping Containers
+Creating Networks
+Creating Volumes
+
+Docker Objects
+---------------
+Docker Daemon manages
+Images
+Containers
+Networks
+Volumes
+
+Linux Kernel
+-------------
+Docker uses Linux Kernel features like
+
+Namespaces
+Cgroups
+OverlayFS
+
+instead of virtualization.
+
+This is why containers are lightweight.
+
+Docker containers are not VMs — they use Linux kernel features:
+
+Namespaces → provide isolation
+ PID (process isolation)
+ NET (network isolation)
+ MNT (filesystem isolation)
+
+cgroups (control groups) → manage resource limits
+CPU
+Memory
+I/O
+
+Namespaces provide isolation (PID, network, mount, etc.), ensuring containers don’t see each other’s resources.
+
+cgroups control resource limits like CPU and memory, preventing one container from consuming all system resources.”
+
+
+
+FLOW
+----
+User
+  ↓
+Docker Client
+  ↓
+Docker Daemon
+  ↓
+Checks Local Image
+  ↓
+Image Available?
+       Yes → Create Container
+       No
+  ↓
+Pull Image from Docker Hub
+  ↓
+Create Container
+  ↓
+Run Container
+
+Docker Editions
+=================
+
+There are mainly two Docker editions.
+
+Docker Community Edition (CE) : FREE. Suitable for students, developers, small companies. Features are
+-----------------------------
+Docker Engine
+Docker CLI
+Docker Compose
+Docker Build
+
+Docker Enterprise Edition (EE): Commercial version. Features
+-----------------------------
+Advanced Security
+Image Scanning
+Enterprise Support
+Role-Based Access Control (RBAC)
+Compliance Features
+Certified Plugins
+SLA Support
+
+Docker Lifecycle
+---------------
+Docker Image
+  ↓
+docker run
+  ↓
+Container Created
+  ↓
+Container Running
+  ↓
+Container Paused
+  ↓
+Container Stopped
+  ↓
+Container Restarted
+  ↓
+Container Removed
+
+OCI (Open Container Initiative)
+==============================
+What is OCI?
+
+The Open Container Initiative (OCI) is an open standard that defines how container images and runtimes should work so that containers are portable across different platforms.
+
+It was launched in 2015 under the Linux Foundation with contributions from companies such as Docker, Red Hat, Google, and many others.
+
+Why OCI Was Needed ?
+-----------------
+Before OCI:
+-----------
+Every vendor could have used its own image format.
+Images built on one platform might not run on another.
+There was no common specification.
+
+OCI solved this by defining standard specifications.
+
+OCI Specifications
+---------------------
+OCI mainly defines:
+
+Image Specification
+----------------
+Standard image format
+Image layers
+Image manifest
+
+Runtime Specification
+-----------------------
+How containers are created and run
+Process execution
+Filesystem layout
+Namespaces and cgroups usage
+
+
+Because Docker images follow the OCI Image Specification, the same image can also run on OCI-compliant runtimes such as:
+
+containerd
+CRI-O
+Podman
+
+This interoperability is one of the biggest advantages of OCI.
+
+
+Docker Installation
+===================
+
+Launch Amazon Linux 2023 EC2 instance - t3.micro
+
+-- yum install docker -y
+-- systemctl start docker
+-- systemctl status docker
+-- docker -v
+
+
+Commands
+--------
+
+-- docker images        [ To show list of images ]
+
+-- docker ps             [To Show list of Running Containers]
+
+-- docker ps -a    [To list all running and stopped containers]
+
+There are two ways to get images
+
+   1. Create image from Dockerfile
+
+   2. Pull the images from DockerHub
+
+
+-- docker pull amazonlinux    [ To get image amazonlinux or ubuntu from DockerHub ]
+
+-- docker pull ubuntu           [ To get image ubuntu from DockerHub ]
+
+-- docker images
+
+-- docker ps -a  [To list all running and stopped containers]
+
+
+
+A Docker image is made up of multiple layers, which are stacked on top of each other. Each layer represents a set of file changes (like adding, modifying, or deleting files) and helps in optimizing storage and reusability.
+
+
+Now, lets try creating a container using this images. Below command will directly log in to contains as we are using -it
+
+-- docker run -it --name amazonlinuxcontainer amazonlinux
+        [ To create container,
+            -it = interactive(go inside container),
+            amazonlinuxcontainer is a container name,
+            amazonlinux is image ]
+      -- ls
+      -- yum install git maven tree httpd -y
+       -- check the version
+      -- touch file{1..10}
+
+      -- ctrl p q   [ To exit from container]
+
+If you dont want to login to container and just want to create a container and run in detach mode use -d
+
+-- docker run -it -d --name ubuntucontainer ubuntu
+
+-- docker ps -a  [To list all running and stopped containers]
+
+-- docker ps    [ To list only running containers ]
+
+If you want to access the container
+
+-- docker attach ubuntucontainer
+-- apt update -y
+-- apt install nginx -y
+      -- ctrl p q ===> to Quit from Contaimner
+
+If you want to run direct commands on container use exec
+
+-- docker exec -it 1275f407dc04 /bin/bash
+
+        -- apt update -y
+        -- apt install git -y
+        -- apt install apache2 -y
+        -- service apache2 start
+        -- service apache2 status
+
+        -- ctrl p q
+
+Docker attach and exec will help to access the container
+
+-- docker attach 1275f407dc04
+
+       -- ctrl p q
+
+-- docker ps -a
+
+docker attach
+-------------
+is used to attach your terminal to the standard input, output, and error streams of the main process running inside a container.
+It allows you to interact with the container's main process as if you were running it directly in your terminal.
+
+Example: attaching/connecting to main wire
+if you use exit command, container is stopped
+
+# docker attach testcontainer
+# exit ===> not recommended ===> use #ctrl+pq
+# docker ps -a
+# docker start testcontainer
+
+docker exec
+-----------
+is used to run a new command in an already running container.
+This command allows you to start additional processes inside the container independently of the main process.
+
+Example: connecting to additional process
+if you use exit command, container will not stop
+
+docker attach interacts with the container's main process (PID 1).
+docker exec starts a new, separate process inside the container.
+
+EXEC is preferred
+
+# docker exec -it testcontainer /bin/bash
+# exit : not recommended ---> use #ctrl+pq
+# docker ps -a
+Safe
+
+
+Summary
+-------
+docker images
+docker pull ubuntu
+docker run -it --name ubuntucontainer ubuntu
+
+docker pull amazonlinux
+docker run -it -d --name amazoncontainer amazonlinux
+docker exec -it 1275f407dc04 /bin/bash : Preferred exec, to login into container
+docker attach 1275f407dc04 : Avoid attach, to login into container
+
+Few container commands
+----------------------
+
+docker search ubuntu         : to search images
+docker ps -a                 : to list all containers
+docker ps                    : to list only running containers
+docker stop testcontainer    : to stop the container , it will be in exit state
+docker start testcontainer   : to start the container
+docker restart [container]   : To Restart Container
+docker pause testcontainer   : Pause processes in a running container. you cannot connect to this container,
+          try docker exec -it contid /bin/bash
+docker unpause cont_name     : Resume processes in a running container
+docker attach testcontainer  : to go inside the container
+docker inspect testcontainer : to get the complete info container
+docker kill testcontainer    : to kill the container or forcibly stop the container
+docker rm testcontainer      : TO delete the container
+docker rm -f [container]     : Forcefully remove even if it is running
+docker logs [container]      : View logs for a running container:
+docker top  [container]      : Show running processes in a container:
+docker stats [container]     : View live resource usage statistics for a container:
+docker diff [container]      : Show changes to files or directories on the filesystem:
+
+docker cp [file-path] CONTAINER:[path] ----> Copy a local file to a directory in a container:
+
+               docker cp hello.txt cont1:/tmp
