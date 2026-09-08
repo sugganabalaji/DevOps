@@ -537,13 +537,14 @@ pipeline {
         }
         stage('deploy') {
             input {
-                message "is your inputs correct ?"
+                message "is your inputs correct ? (yes/no)"
                 ok "yes"
-            steps {
-                deploy adapters: [tomcat9(credentialsId: 'tomcatcreds', path: '', url: 'http://13.126.17.44:8080/')], contextPath: 'myapp', war: '**/*.war'
+
+                steps {
+                    deploy adapters: [tomcat9(credentialsId: 'tomcatcreds', path: '', url: 'http://13.126.17.44:8080/')], contextPath: 'myapp', war: '**/*.war'
+                }
             }
         }
-
     }
 }
 
