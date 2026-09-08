@@ -382,9 +382,9 @@ pipeline {
                 git 'https://github.com/ReyazShaik/java-project-maven-new.git&#39;
 
                 sh '''
-                mvn compile
-                mvn test
-                mvn clean package
+                    mvn compile
+                    mvn test
+                    mvn clean package
                 '''
             }
         }
