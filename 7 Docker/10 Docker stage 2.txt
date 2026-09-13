@@ -1,0 +1,418 @@
+Docker Installation
+===================
+
+Launch Amazon Linux 2023 EC2 instance - t3.micro
+
+-- yum install docker -y
+-- systemctl start docker
+-- systemctl status docker
+-- docker -v
+
+docker images
+
+docker ps -a
+
+docker login
+username: sugganabalaji
+password:
+
+docker pull ubuntu
+
+docker pull amazonlinux
+
+docker images
+
+docker run -itd --name ucont1 ubuntu ==> -d means detach mode
+docker run -itd --name acont1 amazonlinux
+
+docker ps -a
+
+docker top ucont1 ==> What kind of processes are running inside container easily we can find.
+
+docker stats ucont1 ==> We can find, usage for cpu, memory, network
+ctrl + c
+
+ls
+
+touch hello.txt
+
+Syntax:
+-------
+docker cp [file-path] CONTAINER:[path] : Copy a local file to a directory in a container:
+
+-- docker cp hello.txt ucont1:/tmp
+
+/tmp is Dir inside a container ucont1
+
+-- docker exec -it ucont1 /bin/bash [login to container ucont1]
+root@257fa91debe8:/# cd /tmp
+root@257fa91debe8:/tmp# ls
+hello.txt
+root@257fa91debe8:/tmp# ctrl+pq OR exit
+exit
+[root@docker ~]#
+
+
+
+I Want to share docker image to you? How?
+Zip image as tar:
+-----------------
+syntax:
+-------
+docker save IMAGE > IMAGE.tar   : Save an Image to tar file
+-- ls
+-- docker save ubuntu > ubuntu.tar
+-- ls
+
+docker rmi ubuntu [Running containers are there so not deleted docker image]
+docker rm -f ucont1 [Deleting running containers first]
+docker rmi ubuntu [Now deleted image]
+docker images
+
+
+unzip tar:
+----------
+Syntax:
+-------
+docker load -i IMAGE.tar    : Load an image from tar file
+
+-- docker load -i ubuntu.tar
+
+docker images
+
+Syntax:
+docker history IMAGE        : Shows image history
+
+-- docker history ubuntu
+
+docker image prune        : Delete all unused images
+-- docker image prune
+WARNING! This will remove all dangling images.
+Are you sure you want to continue? [y/N] Y
+Total reclaimed space: 0B
+
+-- docker images
+
+docker stop containerid/containername
+ -- docker stop ucont1
+
+-- docker images
+-- docker ps -a
+
+STOP: will wait to finish all process running inside container
+KILL: won't wait to finish all process running inside container
+
+docker ps -a
+docker stop ucont1
+docker rm ucont1
+docker rmi ubuntu
+
+docker stop acont1
+docker rm -f acont1
+docker rmi amazonlinux
+
+docker ps -a
+docker images
+
+=============================================================================================================
+
+TASK: Pull ubuntu image and install apache and mysql server software's
+------------
+docker images
+docker pull ubuntu
+docker run -itd --name ubuntucontainer ubuntu
+docker exec -it ucint1 /bin/bash
+  -- apt update -y
+  -- apt install apache2 -y
+  -- apt install python3 mysql-server -y
+  -- ctrl + p q OR exit
+
+Now we have container with name ubuntucontainer with apache2 and mysql server, lets create our docker image with this container ubuntucontainer
+This command is used to create a docker image whatever data we have in the container.
+
+-- docker images
+
+-- docker commit ubuntucontainer myimagewithapachenmysql
+
+-- docker images
+
+If you want to create a new container with this image myimagewithapachenmysql
+
+-- docker run -it -d --name mycontwithapachemysql myimagewithapachenmysql
+
+-- docker attach mycontwithapachemysql          [Access the container and check the version]
+        -- mysql --version
+
+ctrl+pq --> after exit, container is still running
+ctrl+d --> container will  be stopped if you use ctl+d
+
+docker ps -a  [See container is in exit state]
+docker start cont-name
+docker ps -a
+
+What we did?
+Ubuntu image from dockerhub -> create a container -> Take image(custom image) -> From this images create containers again
+                                 install softwares     this image
+                               contains software's
+manually downloaded  --> Manually created container and installed
+
+This is not a good practise , this is manual
+
+Clean up
+---------
+
+docker ps -a
+
+Delete all containers
+----------------------
+
+docker ps -aq  [List only container-ids]
+
+docker kill $(docker ps -aq)
+
+docker ps -a   [ All containers are in exited state ]
+
+docker rm $(docker ps -aq)
+
+docker ps -a
+
+Delete all the images
+---------------------
+
+docker images -q
+
+docker rmi -f $(docker images -q)
+
+docker images
+
+
+=============
+
+Create a container (without starting it in interactive mode):
+-------------------------------------------------------------
+docker create -it [image]
+
+-- docker create --name ucont1 ubuntu
+
+It will create a Container by pulling image from DockerHub directly.
+
+
+Rename an existing container:
+-----------------------------
+docker rename [container] [new-name]
+
+-- docker rename ucont1 newcont1
+
+docker rm -f newcount1
+docker rmi ubuntu
+
+What is a Docker Image?
+-------------------------
+A Docker Image is one of the most fundamental concepts in Docker. Before you can run a container, you must have an image.
+
+Think of an image as a blueprint or template from which containers are created.
+
+A Docker Image is a read-only template that contains everything needed to run an application:
+
+Application code
+Runtime (Java, Python, Node.js, etc.)
+Libraries
+Dependencies
+Configuration files
+Operating system components
+
+Once an image is created, it cannot be modified directly. When you run it, Docker creates a writable container layer on top.
+
+==============================================================================================================================
+If you want to automate all these use Dockerfile
+
+DOCKERFILE
+----------
+
+It is used to automate image creation.
+Inside Dockerfile we use components to do our works.
+Components will be on Capital Letter.
+In Dockerfile D will be capital.
+We can create image directly without container help
+To create image from file we need to build it.
+
+A Dockerfile is a text file containing a set of instructions used to build a Docker image automatically.
+
+Instead of manually creating a container and installing software every time, we write a Dockerfile once and Docker builds the image consistently.
+
+Docker Build is the process of converting a Dockerfile into a Docker Image.
+
+COMPONENTS:
+----------
+
+FROM       : used to get base image
+RUN        : used to run linux commands during (image creation) build time
+CMD        : used to run linux commands (After container creation) run time
+ENTRYPOINT : high priority than cmd. Defines the main executable of the container.
+COPY       : to copy local files to container
+ADD        : to copy internet files to container
+WORKDIR    : to open req directory
+LABEL      : to add labels for docker images
+ENV        : to set env variables (inside container)
+ARGS       : to pass env variables (outside containers)
+EXPOSE     : Documents the port the application listens on. It does not publish the port to the host.
+
+Dockerfile --> Docker Build -->  Image --> Container
+
+.dockerignore : Docker ignores them. Files which are unnecessarily increase build time. [logs, .git, node modules etc]
+
+
+
+Example 1
+=========
+mkdir 6pm
+cd 6pm
+
+vi Dockerfile
+i
+FROM ubuntu
+RUN apt update -y
+RUN apt install git maven tree apache2 -y
+RUN touch file1
+esc
+:wq! + enter
+
+
+Build Dockerfile.
+Syntax :
+-----------
+docker build -t imagereponame:tagname .
+[ -t here Tags ]
+[  . represent current directory where we have dockerfile ]
+
+-- docker build -t balaji:v1 .
+-- docker images
+
+-- docker run -it --name cont1 balaji:v1   [ You will be now in container and see versions of softwares installed ]
+   -- mvn -v
+   -- git -v
+   -- tree
+   -- which mvn
+   -- ctrl+pq
+-- docker ps -a
+
+Example 2
+===========
+RUN will execute while image creation
+CMD will execute after container creation
+
+Only one CMD should exist.
+
+If multiple CMD instructions are present, only the last one is used.
+
+ls
+mv Dockerfile Dockerfile1
+ls
+
+vi Dockerfile
+
+FROM ubuntu
+RUN apt update -y
+RUN apt install git maven tree apache2 -y
+RUN touch file1
+RUN apt install python3 -y
+CMD apt install mysql-server -y
+
+Note already first few lines are execute, it will not execute again, it will run last lines
+
+CMD will not execute, because it will execute after container creation.
+
+-- docker build -t balaji:v2 .
+-- docker images
+
+-- docker run -it --name cont2 balaji:v2   [don't use -d here for now to see the installation]
+--> now mysql-server is now installing because we used CMD command
+-- docker ps -a
+
+-- docker logs cont2
+clear
+
+
+Example 3
+========
+COPY --> copy local files to container
+ADD --> copy  internet files to container
+
+touch index.html
+--> generate a sample index.html file from chat gpt
+--> past content to file index.html file
+
+ls
+mv Dockerfile Dockerfile2
+ls
+
+vi Dockerfile
+
+FROM ubuntu
+COPY index.html /tmp
+ADD https://dlcdn.apache.org/tomcat/tomcat-10/v10.1.35/bin/apache-tomcat-10.1.35.tar.gz /tmp
+
+
+-- docker build -t balaji:v3 .
+-- docker run -it --name cont3 balaji:v3
+
+now you are in container
+cd /tmp
+ls
+ctrl+pq
+
+ls
+mv Dockerfile Dockerfile3
+
+Example 4
+========
+WORKDIR --> by default , when you are in container it will be in /, if you want to have a default path WORKDIR will use
+LABEL --> just like a tag , we are labeling
+
+vi Dockerfile
+
+FROM ubuntu
+COPY index.html /tmp
+ADD https://dlcdn.apache.org/tomcat/tomcat-10/v10.1.35/bin/apache-tomcat-10.1.35.tar.gz /tmp
+WORKDIR /tmp
+LABEL author Balaji
+
+
+-- docker build -t balaji:v4 .
+-- docker run -it --name cont4 balaji:v4
+
+--> now see the path is /tmp
+
+-- ctrl + pq
+
+--> to see the entire info about container
+-- docker ps -a
+-- docker inspect cont4
+-- docker inspect cont4 | grep Balaji
+
+
+Example 5
+==========
+ENV : environmental variables
+EXPOSE: Documenting port number
+
+ls
+mv Dockerfile Dockerfile4
+ls
+
+vi Dockerfile
+
+FROM ubuntu
+ENV course DevOps
+ENV trainer Balaji
+EXPOSE 8080
+
+
+docker build -t balaji:v5 .
+docker run -it --name cont5 balaji:v5
+echo $course
+echo $trainer
+
+ctrl pq
+
+docker ps -a  [ Now you can see the port number for cont5 ]
