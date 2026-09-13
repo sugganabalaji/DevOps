@@ -14,47 +14,95 @@ Install Jenkins with Script
 
 SETUP: SLAVE 1
 ---------------
-CREATE AN EC2 INSTANCE Amazon Linux 2 AND INSTALL JAVA-11/17
+CREATE AN EC2 INSTANCE Amazon Linux 2023 AND INSTALL JAVA-11/17
 
 
-sudo yum install java-21-amazon-corretto-devel maven git -y
+# sudo yum install java-21-amazon-corretto-devel maven git -y
 
 sudo mount -o remount,size=2G /tmp
 
-Dashboard -- > Manage Jenkins -- >Nodes -- > New node-- > name: salve1 -- > Permanent Agent -- > create
+Dashboard -- > Manage Jenkins -- >Nodes -- > New node-- > name: slave1 -- > Permanent Agent -- > create
 
 Number of executors    : 3 (number of parallel build we can do)
-Remote root directory   : /tmp (where your op is going to store)
+Remote root directory   : /tmp (where your operation is going to store)
 Labels            : slave1 (way of assigning work to particular slave)
-Usage            : last opt
-Launch method        : last opt
-Host            : private-ip of slave
-Credentials        : add -- > Jenkins -- >
+Usage            : last option (Only build jobs with label expressions matching this node/label)
+Launch method        : last option (Launch agents via SSH)
+Host            : ec2 private-ip of slave
+Credentials        : add -- > SSH Username with private key -- >
 kind: ssh username with private key
+ID : slave-creds
+Description : slave-creds
 Username: ec2-user
-Private Key: enter directly -- > copy paste the pem content
-Host Key Verification Strategy: last opt
+Private Key: Select radio button - Enter directly --> Add --> copy and paste the .pem file content of slave.
+Create
+Credentials  : ec2-user (slave-creds)
+Host Key Verification Strategy: last option (Non verifying Verification Strategy)
+Availability    : Keep this agent online as much as possible
 
+Save
+
+Refresh
 
 ================
-Now Setup Slave 2
+Now Setup : New Node: Slave 2
+
+# sudo yum install java-21-amazon-corretto-devel maven git -y
 
 Follow above process -- but one thing generally miss - install amazon-linux-extras install java-openjdk11 -y on slave 2 first and then add node in Jenkins
 
-Create a job , execute on build
+
+Create Pipeline:
+-----------------
+
+New Item > Pipeline1-job > Pipeline > OK
+
+Example 1 with pipeline:
+------------------------
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git 'https://github.com/sugganabalaji/java-project-maven-new.git'
+            }
+        }
+        stage('Compile') {
+            steps {
+                sh 'mvn compile'
+            }
+        }
+        stage('Test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+        stage('Artifact') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+        stage('Deploy') {
+            steps {
+                echo 'Deployed in to Production Environment'
+            }
+        }
+    }
+}
+
+Create a job , execute on build > This will run on Master Jenkins server.
 
 if build fails --> on slave see java version
 
-update-alternatives --config java
+# sudo update-alternatives --config java
 
 run the build again
 
---> if you want to run the pipeline using slave not in configuring Jenkins(Restrict where this project can be run), but directly through pipeline use the below script as agent label
+--> if you want to run the pipeline using slave not in configuring Jenkins (Restrict where this project can be run), but directly through pipeline use the below script as agent label
 
 Example 2 with Pipeline
 -------------------------
-
-
 pipeline {
     agent {
         label 'slave1'
@@ -63,9 +111,9 @@ pipeline {
     stages {
         stage('checkout') {
             steps {
-                git 'https://github.com/ReyazShaik/java-project-maven-new.git&#39;
-        (or)
-        git branch: 'main', url: 'https://github.com/ReyazShaik/java-project-maven.git&#39;
+                git 'https://github.com/sugganabalaji/java-project-maven-new.git'
+                        (or)
+                git branch: 'main', url: 'https://github.com/sugganabalaji/java-project-maven-new.git'
             }
         }
         stage('compile') {
@@ -93,7 +141,7 @@ pipeline {
 
 
 ================
-Monitor Slave machines --> Click on Node --> left side --> Load statistics, System info , Build history etc
+Monitor Slave machines --> Click on Node --> left side --> Load statistics, System information , Build history etc
 
 
 
@@ -101,7 +149,7 @@ Monitor Slave machines --> Click on Node --> left side --> Load statistics, Syst
 SONARQUBE
 =====================================
 It is a tool used to check the code quality
-it supports 20+ langauges
+it supports 20+ languages
 it used to check the bugs, code smells, code duplication, and vulnerabilities.
 it require 2 cpus and 2 gb RAM.
 Dependency: Java-21
@@ -116,9 +164,9 @@ check the security issues(vulnerabilities)
 
 ====== TAKE SonarQube.sh to install ======
 
-
 SETUP: Launch another EC2 instance - Amazon linux 2023 - t2.medium is must , it will not run on micro
 
+vi sonar.sh
 ============ script ========================
 #! /bin/bash
 #Launch an instance with 9000 and t2.medium
@@ -131,61 +179,72 @@ chown sonar:sonar sonarqube-8.9.6.50800 -R
 chmod 777 sonarqube-8.9.6.50800 -R
 su - sonar
 # use the below command manually after installation
-#sh /opt/sonarqube-8.9.6.50800/bin/linux/sonar.sh start
-#echo "user=admin & password=admin"
+# sh /opt/sonarqube-8.9.6.50800/bin/linux/sonar.sh start
+# echo "user=admin & password=admin"
 
 =================================================
+sh sonar.sh
 
 once installed
 manually type below command
 
-sh /opt/sonarqube-8.9.6.50800/bin/linux-x86-64/sonar.sh start
+$ sh /opt/sonarqube-8.9.6.50800/bin/linux-x86-64/sonar.sh start
 
-dont run this - echo "user=admin & password=admin"
-
+don't run this - echo "user=admin & password=admin"
 ==================
 
 ==============================
 If you have stopped the sonar, start the sonar manually
+sh /opt/sonarqube-8.9.6.50800/bin/linux-x86-64/sonar.sh stop
+
 su - sonar
 sh /opt/sonarqube-8.9.6.50800/bin/linux-x86-64/sonar.sh start
 ===============================
 
-Open http://IP:9000
+Open http://ec2-public-IP:9000
 
 username: admin,
 Password : admin
 
+New Password : admin123
 
 
-Add project --> Manually --> project key =boomapp --> generate token--> boomapp --> click on maven
+In Sonar: Generate token
+========================
+Add a project --> Manually --> Project key = hotstar, Description = hotstar --> Setup --> Provide a token = hotstar --> Generate --> Continue --> click on maven
 
+copy Generated token.
 adaa1f0e77d68dde80fde6b61072214e3b076ea5
 
 In Jenkins: Add plugin,
-======================
-
-SonarQube Scanner,
-Maven Integration
+=======================
+SonarQube Scanner
 Sonar Scanner Quality Gates
+Maven Integration
+
 RESTART JENKINS
 
 Go to Credentials
 -----------------
---> Kind= Secret text , secret = c7fc89bc61e79ad060081f980aa3b0a40dfe9115 (sonar project key)
-id --> sonar , description = sonar
+--> Kind= Secret text --> Next -->  secret = adaa1f0e77d68dde80fde6b61072214e3b076ea5 (sonar project key generated above)
+ID --> sonar ====> This name will be used in pipeline
+Description = sonar --> Create
 
 Go to System
 -------------
---> SonarQube servers --> Enable Environment Variables --> Add SonarQube Server
-     Name = SonarQube
-     URL = http://3.110.190.217:9000
+--> SonarQube servers --> Enable/Check Environment Variables --> Add SonarQube
+     Name = SonarQube ====> This name will be used in pipeline
+     Sonar URL = http://3.110.190.217:9000
      Server authentication token = select token - sonar
+
+Save
 
 
 Go to  Tools
 -------------
---> SonarQube Scanner installations , Name = sonarscanner --> dont click add installer
+--> SonarQube Scanner installations , Name = sonarscanner --> Check - Install automatically--> don't click add installer
+
+Save
 
 
 
