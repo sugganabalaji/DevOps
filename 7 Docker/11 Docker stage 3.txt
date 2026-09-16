@@ -1,0 +1,481 @@
+Ec2 amazon linux 2023 > t3.micro
+
+mkdir 6pm
+
+cd 6pm
+
+yum install docker -y
+
+systemctl start docker
+
+docker images
+
+docker ps -a
+
+GitHub: website
+
+We want to Deploy GitHub website project to deploy to Docker container.
+
+First Dockerfile Task for application Deployment
+================================================
+
+Code - GitHub --> DockerFile --> Build Image --> Create Container --> Access application
+
+yum install git -y
+
+git clone https://github.com/sugganabalaji/website.git
+
+--> don't go inside website folder, create Dockerfile outside website
+ls
+
+vi Dockerfile
+
+FROM ubuntu
+RUN apt update
+RUN apt install apache2 -y
+RUN apt install apache2-utils -y
+RUN apt clean
+COPY website/ /var/www/html/
+RUN service apache2 restart
+EXPOSE 80
+CMD ["/usr/sbin/apachectl", "-D", "FOREGROUND"]
+
+
+-D FOREGROUND → Runs Apache in the foreground mode, meaning:
+Apache does not daemonize (does not run in the background).
+Logs are printed to the container's stdout/stderr, making it visible with docker logs.
+The process stays alive, preventing the container from exiting immediately.
+Containers stop when the main process exits. Running Apache in foreground mode ensures the container remains active.
+
+
+-- docker build -t firstproject:v1 .
+
+-- docker run -itd --name newwebcont1 -p 80:80 firstproject:v1
+
+In AWS SG , allow All traffic
+
+http://ip
+
+Note: docker rmi firstimage:v1 [if required]
+
+docker rm -f cont1
+docker rmi -f firstimage:v1
+
+docker images
+docker ps -a
+
+ls
+
+mv Dockerfile Dockerfile1
+
+rm -rf * [Removed all files under 6pm dir]
+
+Another example
+================
+Tomcat installation on Container
+-------------------------------
+
+vi Dockerfile
+press i
+
+# Use the official Tomcat image as the base
+FROM tomcat:latest
+
+# Set environment variables (optional)
+ENV CATALINA_HOME /usr/local/tomcat
+ENV PATH $CATALINA_HOME/bin:$PATH
+
+# Remove default webapps (optional: keeps Tomcat clean)
+RUN rm -rf $CATALINA_HOME/webapps/*
+
+# Copy your application WAR file into the Tomcat webapps directory
+COPY jenkins.war $CATALINA_HOME/webapps/jenkins.war
+
+# Expose Tomcat's default HTTP port
+EXPOSE 8080
+
+# Start Tomcat
+CMD ["catalina.sh", "run"]
+
+press esc
+:wq!
+
+ls
+Download jenkins.war
+Browser https://updates.jenkins.io/download/war/
+copy latest Released 2.582
+wget https://updates.jenkins.io/download/war/2.582/jenkins.war
+ls
+
+
+-- docker build -t tomcatimage:v1 .
+
+-- docker run -itd --name tomcont -p 8080:8080 tomcatimage:v1
+                                 hostport:containerport
+
+http://ip:8080/jenkins
+
+docker exec -it 1275f407dc04 /bin/bash
+# cat /root/.jenkins/secrets/initialAdminPassword
+ past Aministrator password in browser jenkins
+ install suggested plugins
+# df -h
+ Create First Admin User
+ Username: balaji
+ Password: balaji
+ Confirm Password: balaji
+ Full name: balaji
+ Email: bsuggana@gmail.com
+ Save & Continue
+
+ Save & Finish
+
+ Start using Jenkins
+
+# ctrl+pq OR exit
+clear
+
+
+Image Layers
+--------------
+
+A Docker Image is not a single file.
+
+It is made up of multiple layers.
+
+Each Dockerfile instruction generally creates a new layer.
+
+One of Docker's biggest advantages is Layered Architecture.
+
+Each instruction generally creates a new read-only layer.
+
+Example:
+--------
+vi Dockerfile
+
+FROM ubuntu
+RUN apt update
+RUN apt install nginx -y
+COPY index.html /var/www/html
+CMD ["nginx","-g","daemon off;"]
+
+
+Layer 5   CMD
+
+Layer 4   COPY index.html
+
+Layer 3   RUN apt install nginx
+
+Layer 2   RUN apt update
+
+Layer 1   FROM Ubuntu
+
+
+Writable Layer
+    ↓
+Read Only Layer 5
+    ↓
+Read Only Layer 4
+    ↓
+Read Only Layer 3
+    ↓
+Read Only Layer 2
+    ↓
+Read Only Layer 1
+
+
+The container adds one writable layer on top.
+
+
+-- docker history imagename:tag [It shows all the image layer history]
+
+Every RUN creates another image layer. [To reduce the image creation time or size, use less layers]
+
+Docker caches every successfully built layer.
+
+Cache Invalidation
+---------------------
+Docker rebuilds all layers after a changed layer.
+
+Disable Cache
+-------------
+Sometimes we want a fresh build.
+
+-- docker build --no-cache -t app:v1 .
+
+-- docker build --progress=plain .  [Build Progress, detailed logs]
+
+
+Image Optimization
+--------------------
+A Docker image should be
+
+Small
+Secure
+Fast
+Optimization 1 : Use smaller base images. Instead of ubuntu, use alpine or python:3.12-slim
+Optimization 2 : Combine RUN commands. Every RUN command create layers. use Single Layer
+
+BAD
+---
+RUN apt update
+RUN apt install nginx -y
+RUN apt install curl -y
+
+Good
+----
+RUN apt update && \
+    apt install -y nginx curl && \
+    apt clean && \
+    rm -rf /var/lib/apt/lists/*
+
+Optimization 3: Use .dockerignore , avoid copying .git, logs, target, node_modules etc
+Optimization 4: Use COPY instead of ADD
+Optimization 5: Use Multi-stage Builds
+Optimization 6: Avoid latest tag. Always use version tags to have Predictable builds.
+Optimization 8: Clean Package Cache
+RUN apt update && \
+    apt install -y nginx && \
+    apt clean && \
+    rm -rf /var/lib/apt/lists/*
+
+
+Union File System (UnionFS)
+---------------------------
+One of Docker's most powerful features is the Union File System.
+
+It combines multiple read-only layers into a single unified filesystem that the container sees.
+
+Docker merges all these layers into one view.
+
+The container does not see separate layers. It sees as one filesystem.
+
+Read-only Layers
+-----------------
+All image layers are read-only.
+
+When you run a container, Docker creates a writable layer on top.
+Any file changes happen only in the writable container layer.
+
+1. What happens during docker build?
+------------------------------------
+Docker reads the Dockerfile from top to bottom, executes each instruction, creates image layers, caches them when possible, and produces a Docker image.
+
+2. What is a Docker image layer?
+--------------------------------
+An image layer is a read-only filesystem layer created by most Dockerfile instructions. Docker stacks these layers to form the final image.
+
+3. Why is Docker caching useful?
+--------------------------------
+Caching avoids rebuilding unchanged layers, making subsequent builds much faster.
+
+4. What causes Docker cache invalidation?
+-----------------------------------------
+If a Dockerfile instruction changes, or the files used by that instruction change (for example, a COPY source), Docker rebuilds that layer and all following layers.
+
+5. Why should COPY requirements.txt come before COPY . .?
+---------------------------------------------------------
+Because application code changes more frequently than dependencies. Copying and installing dependencies first allows Docker to reuse the cached dependency layer, significantly reducing build times.
+
+6. How do you optimize a Docker image?
+--------------------------------------
+Use a smaller base image (slim or alpine where appropriate)
+Combine related RUN commands
+Use .dockerignore
+Prefer COPY over ADD
+Remove package caches and temporary files.
+Use multi-stage builds
+Run as a non-root user
+Pin image versions instead of using latest
+
+
+| Type           | Description                                                | Example                          |
+| -------------- | ---------------------------------------------------------- | -------------------------------- |
+| Base Image     | Starting point for a Dockerfile                            | `ubuntu:24.04`, `alpine:3.22`    |
+| Official Image | Published/maintained by the upstream project on Docker Hub | `nginx`, `mysql`, `python`       |
+| Custom Image   | Built by you or your organization                          | `website:v1`, `mycompany/api:v2` |
+
+
+1. What is a Docker Image?
+---------------------------
+A Docker Image is a read-only template containing the application, runtime, dependencies, libraries, and configuration needed to create containers.
+
+2. What is the difference between an Image and a Container?
+----------------------------------------------------------
+An image is a static, read-only blueprint. A container is a running, writable instance created from that image.
+
+3. What are Image Layers?
+-----------------------
+Image layers are read-only filesystem layers created by Dockerfile instructions. Docker reuses shared layers across images to save storage and speed up builds.
+
+4. What is the Union File System?
+---------------------------------
+The Union File System combines multiple image layers into a single unified filesystem view, allowing containers to see one coherent directory structure while Docker stores the layers separately.
+
+5. What is a Base Image?
+------------------------
+A base image is the starting image specified with the FROM instruction in a Dockerfile. All subsequent layers are built on top of it.
+
+6. What is an Official Image?
+------------------------------
+An official image is an image published or maintained by the upstream project through Docker Hub. Examples include nginx, ubuntu, mysql, and python.
+
+7. What is a Custom Image?
+---------------------------
+A custom image is an image built by a user or organization using a Dockerfile to package their own application and configuration.
+
+8. What happens if you delete a container?
+--------------------------------------------
+Only the container and its writable layer are removed. The underlying image remains on the system unless you explicitly remove it using docker rmi.
+
+
+
+ENTRYPOINT
+-----------
+Defines the main executable of the container.
+
+Unlike CMD, it cannot be easily replaced.
+
+ENTRYPOINT → "What application should always run?"
+CMD → "What are the default arguments for that application?"
+
+vi Dockerfile
+
+FROM ubuntu:24.04
+CMD ["echo", "Hello from CMD"]
+
+docker build -t cmd-demo .
+docker run cmd-demo  [Output is: Hello from CMD]
+Override CMD
+------------
+docker run cmd-demo date  [It prints date, Docker ignored previous CMD]
+
+So CMD is easily replaced.
+
+
+Only ENTRYPOINT
+---------------
+
+vi Dockerfile
+
+FROM ubuntu:24.04
+ENTRYPOINT ["echo","Hello from ENTRYPOINT"]
+
+
+docker build -t entry-demo .
+docker run entry-demo [Output: Hello from ENTRYPOINT]
+Now run
+--------
+docker run entry-demo date [Output: Hello from ENTRYPOINT date]
+
+Why? Docker actually executed, echo "Hello from ENTRYPOINT" date
+
+The command after the image name became an argument, not a replacement.
+
+ENTRYPOINT cannot be overridden just by passing another command.
+
+
+ENTRYPOINT + CMD (Most Common)
+----------------------------
+
+vi Dockerfile
+
+FROM ubuntu:24.04
+ENTRYPOINT ["echo"]
+CMD ["Hello Docker"]
+
+docker build -t both-demo .
+docker run both-demo [Output: Hello Docker. Docker internally executes echo "Hello Docker"]
+Override CMD
+-------------
+docker run both-demo "DNA by Balaji"  [Output: DNA by Balaji, Docker internally executes echo "DNA by Balaji"]
+
+Notice: ENTRYPOINT stayed, Only CMD changed.
+
+ENTRYPOINT is fixed.
+
+
+
+Example: Just theory
+----------
+
+FROM python:3.12
+
+WORKDIR /app
+COPY . .
+
+ENTRYPOINT ["python", "app.py"]
+CMD ["--port", "8080"]
+
+Running: "docker run myapp" will execute "python app.py --port 8080"
+Running: "docker run myapp --port 9090" will execute "python app.py --port 9090"  [CMD can be replaced, but EntryPoint cannot]
+
+ARG
+----
+Build-time variable.
+
+vi Dockerfile
+
+ARG VERSION=1.0
+FROM ubuntu
+RUN echo $VERSION
+
+
+docker build --build-arg VERSION=2.0 .
+
+
+| ARG                                           | ENV                                    |
+| --------------------------------------------- | -------------------------------------- |
+| Build time                                    | Runtime                                |
+| Not persisted in running container by default | Available inside the running container |
+
+
+STOPSIGNAL
+---------
+No need to run***
+
+Specifies which signal Docker sends when stopping the container.
+
+vi Dockerfile
+STOPSIGNAL SIGTERM
+
+Useful for applications that need graceful shutdown.
+
+ONBUILD
+-------
+No need to run***
+Creates a trigger that executes when another image uses this image as its base.
+Don't execute this instruction now. Execute it later when someone uses this image as a base image.
+
+vi Dockerfile
+FROM ubuntu
+
+ONBUILD COPY . /app
+
+Mostly used for creating reusable base images.
+
+
+1. What is a Dockerfile?
+----------------------
+A Dockerfile is a text file containing instructions that Docker follows to build a container image automatically and consistently.
+
+2. What is the difference between CMD and ENTRYPOINT?
+---------------------------------------------------
+CMD specifies the default command or default arguments and can be overridden when starting the container.
+ENTRYPOINT defines the main executable that always runs. Command-line arguments are appended to it unless it is explicitly overridden with --entrypoint.
+
+3. What is the difference between COPY and ADD?
+----------------------------------------------
+COPY copies files and directories from the build context into the image.
+ADD can also automatically extract local tar archives and supports additional source types. For most use cases, COPY is recommended because it is simpler and more predictable.
+
+4. What is the difference between ENV and ARG?
+---------------------------------------------
+ARG is available only during the image build process.
+ENV sets environment variables that are available both during image creation (after they are defined) and when the container runs.
+
+5. What is the purpose of EXPOSE?
+-------------------------------
+EXPOSE documents the port on which the application inside the container listens. It does not make the port accessible from the host; publishing requires the -p or --publish option when running the container.
+
+======================================================================================================================
