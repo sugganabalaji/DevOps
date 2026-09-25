@@ -1,0 +1,599 @@
+Ec2 amazon linux 2023 > t3.micro
+
+mkdir balaji
+
+cd balaji
+
+yum install docker -y
+
+systemctl start docker
+systemctl status docker
+q
+docker images
+docker ps -a
+
+In Docker we don't have inbuilt Load Balancer. Docker not support Load Balancer.
+So we setup load balancer (manually), by setup ec2 and install nginx
+
+Load Balancing Project with Docker-Compose
+==========================================
+📌 Nginx Load Balancer - Dockerfile Setup
+--------------------------------------
+
+                     Container     --- Container1- backend1
+User --------> NGinx Load Balancer --- Container2- backend2
+                                   --- Container3- backend3
+
+We need image for Nginx LB, for that we need Dockerfile, and we take other account dockerhub image for backend
+
+This Dockerfile will set up Nginx as a Load Balancer for multiple backend services inside Docker.
+
+Step 1: Create a Dockerfile to generate image for Nginx LB
+Step 2: Create nginx.conf locally and copy to containers through docker-compose
+Step 3: Create docker-compose file to create containers in one shot
+
+1️. Create the Dockerfile
+--------------------------
+
+vi Dockerfile
+
+# Use the official Nginx image
+  FROM nginx:latest
+
+# Remove default config and copy custom nginx.conf
+RUN rm /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/conf.d/
+
+# Expose port 80
+EXPOSE 80
+
+# Start Nginx
+CMD ["nginx", "-g", "daemon off;"]
+
+
+
+is used to keep Nginx running in the foreground when running inside a Docker container.
+- Why is daemon off; Needed?
+By default, Nginx runs as a background (daemon) process.
+In a Docker container, the main process must stay in the foreground.
+If Nginx runs as a daemon, Docker thinks the container has exited.
+Setting "daemon off;" prevents it from running in the background, keeping the container alive
+
+2️. Create the Nginx Load Balancer Config (nginx.conf)
+-------------------------------------------------------
+
+vi nginx.conf
+i
+
+# Define the upstream backend servers
+upstream backend {
+    server backend1:5000;
+    server backend2:5001;
+    server backend3:5002;
+}
+
+server {
+    listen 80;
+
+    location / {
+        proxy_pass http://backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+esc
+:wq!
+
+
+3️. Create a docker-compose.yml (Optional)
+-------------------------------------------
+
+First install docker-compose
+
+vi dockercompose.sh
+
+sudo dnf install libxcrypt-compat
+sudo curl -L "https://github.com/docker/compose/releases/download/1.29.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+ls /usr/local/bin/
+sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+docker-compose version
+
+-- sh dockercompose.sh
+
+Is this ok[y/N]: y
+
+
+
+
+vi docker-compose.yml
+
+version: '3.8'
+services:
+  nginx:
+    build: .
+    container_name: nginx-lb
+    ports:
+      - "80:80"
+    depends_on:
+      - backend1
+      - backend2
+      - backend3
+
+  backend1:
+    image: ghcr.io/benc-uk/python-demoapp
+    container_name: backend1
+    expose:
+      - "5000"
+
+  backend2:
+    image: ghcr.io/benc-uk/python-demoapp
+    container_name: backend2
+    expose:
+      - "5001"
+
+  backend3:
+    image: ghcr.io/benc-uk/python-demoapp
+    container_name: backend3
+    expose:
+      - "5002"
+
+
+-- docker-compose up -d --build
+-- docker-compose ps
+-- docker ps -a
+
+(or)
+
+-- docker build -t nginx-lb .
+-- docker run -d -p 80:80 --name nginx-lb nginx-lb
+
+http://IP
+
+monitor
+
+-- docker-compose stop backend3   ---- still app will run
+-- docker-compose ps
+
+✅ Explanation:
+
+Here Nginx works as a
+    Web Server.
+    Load Balancer.
+    Reverse Proxy.
+
+Nginx Load Balancer (nginx-lb) forwards traffic to backend1, backend2, and backend3.
+Each backend service listens on different ports.
+
+
+-- docker ps -a
+-- docker stop $(docker ps -q) && docker rm $(docker ps -aq)
+-- docker ps -a
+
+docker rmi $(docker images -q)
+docker volume rm $(docker volume ls -q)
+
+
+New Project:
+================================================================
+📌 Docker Load Balancing with Python Application using Nginx
+===============================================================
+
+✅ Deploy multiple Python Flask applications as backend services.
+✅ Use Nginx as a load balancer to distribute traffic.
+✅ Use Docker Compose for easy deployment.
+
+
+1️. Create the Python Flask App (app.py)
+========================================
+vi app.py
+
+from flask import Flask
+import socket
+
+app = Flask(__name__)
+
+@app.route('/')
+def hello():
+    return f"Hello from {socket.gethostname()}!"
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+
+2️. Create requirements.txt
+===========================
+
+vi requirements.txt
+flask
+
+3️. Create the Python App Dockerfile
+=====================================
+
+vi Dockerfile
+
+# Use Python base image
+FROM python:3.9
+
+# Set working directory
+WORKDIR /app
+
+# Copy and install dependencies
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+# Copy the application code
+COPY . .
+
+# Expose the port Flask runs on
+EXPOSE 5000
+
+# Start the Flask app
+CMD ["python", "app.py"]
+
+
+
+
+4️. Create Nginx Load Balancer Config (nginx.conf)
+==================================================
+vi nginx.conf
+
+# Define the upstream backend servers
+upstream backend {
+    server backend1:5000;
+    server backend2:5000;
+    server backend3:5000;
+}
+
+server {
+    listen 80;
+
+    location / {
+        proxy_pass http://backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+
+5️. Create docker-compose.yml
+=============================
+
+vi docker-compose.yml
+
+version: '3'
+
+services:
+  nginx:
+    image: nginx:latest
+    container_name: nginx-lb
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - backend1
+      - backend2
+      - backend3
+
+  backend1:
+    build: .
+    container_name: backend1
+    expose:
+      - "5000"
+
+  backend2:
+    build: .
+    container_name: backend2
+    expose:
+      - "5000"
+
+  backend3:
+    build: .
+    container_name: backend3
+    expose:
+      - "5000"
+
+
+-- docker-compose up -d --build
+
+-- docker ps -a
+
+http://IP
+
+-- docker-compose down
+-- docker ps -a
+
+-- docker rmi -f $(docker images -q)
+-- docker volume rm $(docker volume ls -q)
+
+-- docker images
+
+
+
+
+
+
+=======================
+DOCKERHUB
+=======================
+
+
+-- docker images
+
+instead storing images in local docker host , push to dockerhub
+
+go to docker and signup
+
+First lets have all Internetbanking, mobilebanking, Insurance and Loans images locally
+
+-- yum install -y git
+
+-- git clone https://github.com/ReyazShaik/hdfcwebsite.git
+            (OR)
+-- git clone https://github.com/sugganabalaji/hdfc-website.git
+
+-- cd hdfc-website
+
+-- cd internetbanking
+
+Here already index.html is available, just create a Dockerfile
+
+vi Dockerfile
+
+FROM ubuntu
+RUN apt update -y
+RUN apt install apache2 -y
+COPY index.html /var/www/html
+CMD ["/usr/sbin/apachectl", "-D", "FOREGROUND"]
+
+-- docker build -t internetbanking:v1 .
+
+
+NOTE: Do the same for Mobilebanking, Insurance and Loans
+
+-- docker build -t mobilebanking:v1 .
+-- docker build -t insurance:v1 .
+-- docker build -t loans:v1 .
+
+
+[Lets first tag our image]
+
+-- docker tag internetbanking:v1 trainerreyaz/ib-image:v1
+        (OR)
+-- docker tag internetbanking:v1 sugganabalaji/ib-image:latest
+
+
+-- docker push trainerreyaz/ib-image:v1 --> it will fail, no authentication
+        (OR)
+-- docker push sugganabalaji/ib-image:latest --> it will fail, no authentication
+
+-- docker login
+
+    username: sugganabalaji
+    password: Balubava@2018
+
+-- docker push trainerreyaz/ib-image
+        (OR)
+-- docker push sugganabalaji/ib-image
+
+**** Now see the images in dockerhub
+*** One time docker login is enough
+
+docker tag mobilebanking:v1 trainerreyaz/mb-image
+docker push trainerreyaz/mb-image
+        (OR)
+docker tag mobilebanking:v1 sugganabalaji/mb-image
+docker push sugganabalaji/mb-image
+
+docker tag insurance:v1 trainerreyaz/insurance-image
+docker push trainerreyaz/insurance-image
+        (OR)
+docker tag insurance:v1 sugganabalaji/insurance-image
+docker push sugganabalaji/insurance-image
+
+docker tag loans:v1 trainerreyaz/loans-image
+docker push trainerreyaz/loans-image
+        (OR)
+docker tag loans:v1 sugganabalaji/loans-image
+docker push sugganabalaji/loans-image
+
+
+--- Now all your images are in DockerHub, just delete the images from local docker host, and you can get them from DockerHub again
+
+-- docker rmi -f $(docker images -aq)
+
+-- docker pull trainerreyaz/ib-image
+-- docker pull trainerreyaz/mb-image
+-- docker pull trainerreyaz/insurance-image
+-- docker pull trainerreyaz/loans-image
+        (OR)
+-- docker pull sugganabalaji/ib-image
+-- docker pull sugganabalaji/mb-image
+-- docker pull sugganabalaji/insurance-image
+-- docker pull sugganabalaji/loans-image
+
+Now pull images from DockerHub
+
+-- docker pull trainerreyaz/ib-image:latest
+        (OR)
+-- docker pull sugganabalaji/ib-image:latest
+
+-- docker run -itd --name cont1 -p 80:80 trainerreyaz/ib-image:latest
+        (OR)
+-- docker run -itd --name cont1 -p 80:80 sugganabalaji/ib-image:latest
+
+
+
+Docker Restart Policies
+=======================
+Docker Restart Policies control what Docker should do with a container, if it stops, crashes, or if the Docker daemon or host restarts.
+
+This is commonly used in production to keep important services like Nginx, MySQL, Jenkins, and Prometheus running automatically.
+
+Why Restart Policies?
+---------------------
+Imagine you have an Nginx container running.
+
+Client is talking to --> Nginx Container
+
+Suddenly, Application crashes or Docker daemon restarts or Server reboots
+
+Without a restart policy: Container is Stopped. The application remains unavailable until someone manually starts it.
+
+With a restart policy: Container Stops --> Docker Automatically Starts It. This improves application availability.
+
+Types of Restart Policies
+---------  -----------------
+Docker supports four restart policies:
+|----------------|-------------------------------------------------------------------|
+| Policy         | Description                                                       |
+| -------------- | ----------------------------------------------------------------- |
+| no             | Never restart the container (default)                             |
+| on-failure     | Restart only if the container exits with a non-zero exit code     |
+| always         | Always restart the container whenever it stops or Docker restarts |
+| unless-stopped | Restart automatically unless the user explicitly stopped it       |
+|----------------|-------------------------------------------------------------------|
+
+1. no (Default)
+----------------
+Docker does nothing. If the container stops, it remains stopped.
+
+Run Container
+
+-- docker run -d --name web nginx
+
+or explicitly
+
+-- docker run -d --restart=no --name web nginx
+
+-- docker inspect web | grep RestartPolicy -A 3       -- [Output= Name : no]
+
+-- docker stop web [Containers just Stopped with Exit 0]
+
+-- docker ps -a
+
+Docker will never restart it automatically.
+
+2. on-failure
+--------------
+Docker restarts the container only if
+
+Application exits with an error. Exit Code 0 means Success. Exit Code 1 means Failure
+
+-- docker run -itd --name cont1 --restart=on-failure ubuntu false      --[false: always return exit code 1, docker see application failed and restart]
+
+-- docker run -itd --name cont2 --restart=on-failure:5 ubuntu false     --[Docker tries 5 times, after 5 times containers stops]
+
+-- docker rm -f cont1
+-- docker rm -f web
+
+When to Use ?
+
+Batch jobs
+Cron jobs
+Data processing
+Scripts
+
+
+always
+-------
+This is the most commonly used restart policy.
+
+Docker restarts the container
+
+If application crashes
+If Docker daemon restarts
+If server reboots
+If container exits
+
+-- docker run -itd --restart=always --name cont3 nginx
+
+-- docker inspect cont3 | grep RestartPolicy -A 3      --[Restart Policy Name: always]
+
+Now stop the container
+
+-- docker stop cont3
+
+Container stops. If the Docker daemon or the host is restarted, Docker will start the container again because the policy is always.
+
+-- systemctl restart docker [Restart the Daemon]
+
+-- docker ps -a    -- [Now see cont3 is up !!]
+-- docker rm -f cont3
+
+Production Use
+
+Jenkins
+Nginx
+Apache
+MySQL
+Redis
+Prometheus
+Grafana
+
+unless-stopped
+--------------
+Similar to "always" except If you manually stop the container, Docker remembers your choice.
+
+-- docker run -d --restart=unless-stopped --name cont4 nginx
+
+-- docker inspect cont3 | grep RestartPolicy -A 3      --[Restart Policy Name: unless-stopped]
+
+-- docker stop cont4
+
+Now reboot Docker or the host. Container remains stopped. Docker respects your manual stop.
+
+| Policy         |            Crash           | Docker Restart | Server Reboot |                 Manual Stop                |
+| -------------- | :------------------------: | :------------: | :-----------: | :----------------------------------------: |
+| no             |            ❌ No            |      ❌ No      |      ❌ No     |                Stays stopped               |
+| on-failure     | ✅ Yes (non-zero exit code) |      ❌ No      |      ❌ No     |                Stays stopped               |
+| always         |            ✅ Yes           |      ✅ Yes     |     ✅ Yes     |   Starts again after Docker/host restart   |
+| unless-stopped |            ✅ Yes           |      ✅ Yes     |     ✅ Yes     | **Remains stopped** until manually started |
+
+
+Best Practices
+--------------
+Use always for services that must always be available (for example, reverse proxies or monitoring agents).
+Use unless-stopped for long-running applications that administrators may intentionally stop for maintenance.
+Use on-failure for jobs or scripts that should retry only after failures.
+Leave the default no for containers you intend to start manually.
+
+Interview Questions
+---------------------
+1. What is a Docker restart policy?
+-------------------------------------
+A restart policy tells Docker whether and when to automatically restart a container after it exits, crashes, or after Docker/the host restarts.
+
+2. What is the default restart policy?
+-------------------------------------
+no
+
+Docker does not automatically restart the container.
+
+3. What is the difference between always and unless-stopped?
+----------------------------------------------------------
+always restarts the container even if it was manually stopped, once the Docker daemon or host restarts.
+unless-stopped also restarts automatically after crashes or reboots, but not if the container was manually stopped.
+
+4. What is on-failure?
+------------------------
+
+It restarts the container only when the application exits with a non-zero exit code, indicating failure.
+
+5. How do you change the restart policy of an existing container?
+----------------------------------------------------------------
+docker update --restart=unless-stopped container_name
+
+6. How do you check a container's restart policy?
+-----------------------------------------------
+docker inspect -f '{{ .HostConfig.RestartPolicy.Name }}' container_name
+
+7. Which restart policy is commonly used in production?
+----------------------------------------------------------
+always for infrastructure services that should always come back automatically.
+unless-stopped for most long-running applications, because it respects intentional manual stops.
