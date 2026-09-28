@@ -1,0 +1,686 @@
+Ec2 amazon linux 2023 6.1 kernel AMI, t3.micro - 3 instances same type
+
+docker-swarm-manager
+worker-node-1
+worker-node-2
+
+Open/login 3 tabs in MobaXterm.
+> manager
+> worker1
+> worker2
+
+Now open manager tab > click MultiExec mode.
+
+-- yum install docker -y
+-- systemctl start docker
+-- clear
+
+click X Exit multi-execution mode.
+
+=============
+DOCKER SWARM - High Availability
+=============
+
+Diagram docker swarm.png
+
+If container deleted we can re-create manually or using docker-compose, by if the docker host is terminated ?
+
+Docker swarm uses multiple host machines
+
+Docker Swarm is Docker's native container orchestration platform. It allows you to manage multiple Docker hosts as a single cluster, deploy applications across multiple nodes, scale services, perform rolling updates, and provide high availability.
+
+              Docker Swarm Cluster
+                       │
+        ┌──────────────┬──────────────┐
+        │              │              │
+   Manager Node    Worker Node    Worker Node
+        │              │              │
+     Container      Container      Container
+
+Why Docker Swarm?
+-----------------
+Without Swarm
+
+Manual deployment
+Manual scaling
+Manual recovery
+No clustering
+Difficult management
+
+With Swarm
+----------
+Cluster Management
+Auto Scheduling
+Auto Recovery
+Load Balancing
+Scaling
+Rolling Updates
+High Availability
+
+It's an orchestration tool for containers.
+It is cluster used to manage containers.
+Cluster means group of servers.
+Cluster will have manager and worker nodes.
+Multiple servers will have same container.
+  If we can access container from one server we can access from another server.
+Manager node will distribute containers worker node.
+Worker node will maintain containers.
+port : 2377
+Worker nodes join
+
+
+SETUP:
+1. CREATE 3 SERVERS AND INSTALL DOCKER
+2. SET HOSTNAMES (hostnamectl set-hostname manager/worker1/worker2)
+3. GO TO MANAGER NODE (docker swarm init) -- > copy token to all nodes
+4. docker node ls
+
+
+Install docker in master, node1 and node2
+
+-- yum install -y docker
+-- systemctl start docker
+
+-- docker swarm init  -- [ In manager node ]
+
+It will generate a token and command, run below command in all worker nodes
+[docker swarm join --token SWMTKN-1-37z7p3f5rrqe0oxni670r2x0qperemx6fh2itzjyrtq90dqqf4-93i4yrpw6ze1rm6nsqb5lna5d 172.31.34.53:2377]
+
+
+In Node1
+--------
+-- docker swarm join --token SWMTKN-1-37z7p3f5rrqe0oxni670r2x0qperemx6fh2itzjyrtq90dqqf4-93i4yrpw6ze1rm6nsqb5lna5d 172.31.34.53:2377
+
+In Node2
+--------
+-- docker swarm join --token SWMTKN-1-37z7p3f5rrqe0oxni670r2x0qperemx6fh2itzjyrtq90dqqf4-93i4yrpw6ze1rm6nsqb5lna5d 172.31.34.53:2377
+
+
+
+Now create a container in manager node, it should create in all worker nodes
+
+On Manager
+----------
+-- docker node ls
+
+-- docker run -itd --name cont1 -p 81:80 sugganabalaji/ib-image     [use dockerhub image]
+
+-- docker ps -a
+
+But the above command will create a container only in manager as we used just docker command. If we want to have container in all nodes use docker service.
+
+-- docker rm -f cont1
+
+-- docker service create --name internetbanking --replicas 3 -p 81:80 sugganabalaji/ib-image:latest
+
+-- docker service ls
+
+-- docker ps -a
+
+Now see containers in all worker nodes, go to each workernodes and do ps -a
+
+-- docker ps -a
+
+Access application on all 3 servers http://IP:81  , http://workernodeip:81
+
+-- docker service ls
+
+-- docker service ps internetbanking
+
+-- docker service logs internetbanking
+
+-- docker service inspect internetbanking
+
+-- docker service scale internetbanking=10    --- it will scale out , equally distributed to all worker nodes including manager
+
+-- docker service ps internetbanking
+
+-- docker service scale internetbanking=3  -- it will scale down, it uses LIFO,
+
+-- docker service ps internetbanking
+
+Chat GPT: Docker containers  has port conflicts but docker swarm does not have. Why?
+> docker swarm uses 'routing mess' internally.
+
+Give example again
+-- docker service scale internetbanking=15
+-- docker service scale internetbanking=5
+
+-- docker service rollback internetbanking  --- going back to how many containers was there before
+- it will show 15
+- again rollback it will show 5
+
+Rolling Updates
+---------------
+If you want to update with new image without application downtime.
+[updating/replacing with mobilebanking image with current running internetbanking image]
+
+-- docker service update --image sugganabalaji/mb-image internetbanking
+
+http://ip:81
+
+-- docker service ps internetbanking
+
+Docker is also Idempotent. it will delete existing image and create new image.
+
+-- docker service rollback internetbanking [Roll back to previous version]
+
+http://ip:81
+
+-- docker service ps internetbanking
+
+
+scenario:
+---------
+if we delete the container in worker node docker kill container-id , docker rm container-id and check the http://IP:81 it still work
+because, nodes has self-healing/auto-healing, if you do docker ps -a, you can see a new container created automatically.
+
+delete the container again, it will re-create it automatically
+--> docker stop contids
+--> docker rm contids
+
+-- docker rm -f 0ec9be014623 [manager node or try any node]
+
+-- docker ps -a
+
+--> now in manager node delete the service which contain containers
+
+-- docker service ls
+
+-- docker service rm internetbanking
+
+-- docker service ls
+
+if you want to re-create
+
+-- docker service create --name loan --replicas 3 -p 82:80 sugganabalaji/loans-image:latest
+
+-- docker service ps loan
+
+-- docker service create --name mobilebanking --replicas 3 -p 83:80 sugganabalaji/mb-image:latest
+
+-- docker service rm loan
+
+-- docker service rm mobilebanking
+
+-- docker ps -a
+
+********** No auto-scaling and No load balancer in DockerSwarm that why we use Kubernetes
+
+Note: If entire swarm is not working
+docker swarm init --force-new-cluster
+
+===================================================================
+Example:
+
+-- docker service create --name jenkins --replicas 3 -p 8080:8080 jenkins/jenkins:lts
+
+---> create a new service called Jenkins and setup Jenkins containers in all nodes
+
+jenkins/jenkins:lts -> username/image:tag
+
+=============================================================================================================================================
+
+Cluster Activities:
+===================
+
+-- docker swarm leave  --> this will leave the swarm, do this in worker node
+if you want to join back -> use the same join command to join back to swarm (up arrow   or history command) or
+
+-- docker swarm join-token manager --> this command will generate a token to join. [In manager]
+-- docker swarm join-token worker --> this command will generate a token for worker nodes to join manager.
+
+-- docker node ls
+
+docker node rm nodeid --> it will remove the down node
+
+-- docker node rm drmzv8hvc6y0f4frlkaygt1ep
+
+-- docker node ls
+
+
+
+
+
+
+
+
+
+
+
+===================
+Docker Networking
+===================
+
+Docker networking are used to make communication between the multiple containers that are running on same or different docker hosts.
+
+Different Docker Networks
+-------------------------
+ --> Bridge Network = Same hosts (if 2 containers wants to communicate with each other in same docker host machine.)
+                      container gets its own IP.
+                      The Bridge network is the 'default network' for containers on a 'Single Docker host'.
+                      When you install Docker, it automatically creates a bridge network called 'bridge'.
+
+                    Host Machine
+
+             +----------------------+
+             |     docker0 Bridge   |
+             +----------+-----------+
+                        |
+        -------------------------------
+        |             |              |
+        ▼             ▼              ▼
+   Container1    Container2    Container3
+   172.17.0.2    172.17.0.3    172.17.0.4  --> these are private IPs
+
+Docker creates a virtual bridge (docker0) and assigns private IP addresses to containers.
+
+
+ --> Overlay Network = Different hosts (2 containers want to communicate with each other in different docker hosts).
+                       Overlay networks connect containers running on different Docker hosts.
+                       Containers communicate as if they were on the same network.
+                       Docker Swarm uses Overlay Network.
+
+ --> Host Network = if you want to use HOST meaning EC2 networking. With the Host network, the container shares the host's network
+                     stack. No container IP, No NAT, No port mapping. The application listens directly on the host network.
+                    Highest network performance
+                    No NAT
+                    Low Latency
+                    But, Port Conflicts and Less Isolation
+
+ --> None Network = if you don't want to expose any application. No networking at all. Container has no internet, No external
+                    communication , only localhost. use cases are Security testing, Offline processing, Sensitive workloads
+
+ --> Macvlan = Macvlan gives each container its own MAC address and IP address on the physical network.
+               The container appears as a separate device on the LAN. use cases: Legacy applications, DHCP based env, Network
+               Appliances , Applications requiring direct LAN visibility
+
+
+-- docker node ls
+
+-- docker network ls
+
+Explain Name and Driver as per output
+
+-- docker network create reyaz
+        (OR)
+-- docker network create balaji
+
+-- docker network ls
+
+
+-- docker run -itd --name cont1 -p 81:80 nginx:latest
+-- docker run -itd --name cont2 -p 82:80 nginx:latest
+
+-- docker inspect cont1
+-- docker inspect cont2
+
+BY default networking part it say Bridge by default.
+
+Let's change the network for cont1 to balaji network that we created before
+
+-- docker network connect balaji cont1
+-- docker network connect balaji cont2
+
+-- docker network inspect balaji  --> this will show cont1 and cont2 in same network
+
+Let's see if 2 containers can communicate each other or not
+
+Get the IP address of cont1
+
+-- docker inspect cont1
+"IPAddress": "172.17.0.2"
+
+first connect to cont2
+
+-- docker exec -it cont2 /bin/bash
+
+now you are in cont2
+
+-- apt update -y
+
+-- ping 172.17.0.2
+
+ping IP of cont1 --> ping will not work
+
+-- apt install iputils-ping -y
+
+ping cont1-ip
+
+-- ping 172.17.0.2
+
+-- ctrl + c
+
+-- ctrl + pq
+
+
+-- docker network disconnect balaji cont2 --> if you want to remove cont2 from Reyaz network
+
+-- docker network inspect balaji  --> now you cannot see cont2 in that json
+
+
+-- docker network prune --> this will delete unused networks
+
+-- docker system prune --> also delete the networks
+
+-- docker network ls
+
+-- docker network rm balaji [not removed, active endpoint found]
+
+-- docker network inspect balaji
+
+-- docker network disconnect balaji cont1
+
+-- docker network ls
+
+
+1. What is the default Docker network?
+--------------------------------------
+The default network is the bridge network, which allows containers on the same host to communicate using private IP addresses.
+
+2. What is the difference between the default bridge and a user-defined bridge?
+------------------------------------------------------------------------------
+Default bridge: Containers communicate by IP address unless additional configuration is done.
+User-defined bridge: Provides built-in DNS, allowing containers to communicate using container names (for example, web can reach db by name). This is the recommended approach.
+
+3. When should you use Host networking?
+------------------------------------------
+Use the host network when you need maximum network performance and can tolerate reduced isolation, such as for monitoring agents or high-performance network applications.
+
+4. What is an Overlay network?
+-------------------------------
+An Overlay network connects containers across multiple Docker hosts. It is primarily used with Docker Swarm to enable secure, multi-host container communication.
+
+5. What is a Macvlan network?
+------------------------------
+A Macvlan network assigns each container its own MAC address and IP address on the physical network, making the container appear as a separate machine on the LAN. This is useful for legacy applications and environments where containers must be directly reachable by other devices.
+
+6. Docker GUI?
+--------------
+Docker Desktop
+Portainer
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+=========================
+Docker Python FLask Project
+=========================
+
+yum install -y docker
+
+yum install -y git
+
+git clone https://github.com/ReyazShaik/docker-python-flask-project.git
+    (OR)
+git clone https://github.com/sugganabalaji/docker-python-flask-project.git
+
+cd docker-python-flask-project
+
+ls
+Show files
+
+vi Dockerfile
+
+FROM python:3.6
+COPY . /app
+WORKDIR /app
+RUN pip install -r requirements.txt
+#ENTRYPOINT ["python"]
+EXPOSE 5000
+CMD ["python", "app.py"]
+
+Create image
+-----------
+-- docker build -t pythonapp .
+
+Create Container
+----------------
+-- docker run -d -p 5000:5000 pythonapp
+
+
+http://ip:5000
+
+-- docker rm -f $(docker ps -aq)
+
+--docker rmi $(docker images -q)
+
+to remove service from docker swarm
+-- docker service  ls
+-- docker service rm servicename
+
+
+
+
+
+
+
+
+
+
+
+
+================================
+Docker Swarm - Managing Secrets
+================================
+A secret is an information that should be kept hidden from unauthorized users and applications. Examples of secrets include usernames, passwords, private keys, certificates, and resource names and locations.
+
+vi db_password.txt
+DnA@123
+
+-- docker secret create db_password db_password.txt [store secret inside container]
+
+-- docker secret ls
+-- docker secret inspect db_password
+-- cat db_password.txt
+
+
+Example 1: Using the command line interface
+-------------------------------------------
+-- docker service create --name mynginx --secret db_password nginx:latest
+
+-- docker ps -a [container can created any where in cluster as i didnt mentioned replicas]
+             [check in node1 or node2]
+
+-- docker exec 7be95f99dbad cat /run/secrets/db_password
+
+
+Example 2: Using docker compose file
+-------------------------------------
+
+vi docker-compose.yml
+
+version: '3.8'
+
+services:
+  db:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: webuser
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB: webdatabase
+    secrets:
+      - db_password
+
+  adminer:
+    image: adminer:latest
+    ports:
+     - 8080:8080
+
+secrets:
+  db_password:
+    file: db_password.txt
+
+
+-- docker stack deploy --compose-file docker-compose.yml myapp
+
+-- docker stack ls
+
+A Stack is a group of related services defined in a Compose file
+
+Docker Compose: Single Host
+Docker Stack: Multi Node Cluster. TO run stack we need docker swarm setup
+
+docker exec -it ba1ffcadfa4a /bin/bash
+
+http://EC2IP:8080
+
+system: PostGres
+server: db
+username: webuser
+Password: DnA@123
+Database: webdatabase
+
+-- docker stack rm myapp
+
+-- docker secret rm db_password
+
+-- docker service  ls
+
+-- docker service rm mynginx
+
+-- docker secret rm db_password
+
+-- docker service  ls
+
+-- docker ps -a
+
+-- docker images
+
+
+The secrets section in the docker compose file should be updated to tell the docker engine that the secret dp_password is created outside the compose file:
+
+secrets:
+  db_password:
+    external: true
+
+
+| Docker Compose                   | Docker Swarm                  |
+| -------------------------------- | ----------------------------- |
+| Single host                      | Multi-host cluster            |
+| Development & testing            | Production orchestration      |
+| `docker compose up`              | `docker stack deploy`         |
+| No built-in scaling across hosts | Supports replicas and scaling |
+| No built-in high availability    | High availability             |
+| Local networking                 | Overlay networking            |
+
+
+1. What is Docker Swarm?
+-------------------------
+Docker Swarm is Docker's native orchestration platform that manages multiple Docker hosts as a single cluster.
+
+2. What is the difference between a Manager and a Worker?
+-------------------------------------------------------
+| Manager                 | Worker                    |
+| ----------------------- | ------------------------- |
+| Controls the cluster    | Runs tasks/containers     |
+| Schedules services      | Executes assigned work    |
+| Maintains cluster state | Cannot manage the cluster |
+
+
+3. What is a Service?
+----------------------
+A Service defines the desired state of an application in Swarm, including the image, number of replicas, networking, and update behavior.
+
+4. What is a Replica?
+-----------------------
+A replica is one running instance (task/container) of a service. Multiple replicas provide scalability and high availability.
+
+5. What is a Stack?
+------------------------
+A Stack is a collection of related services deployed together from a Compose file using docker stack deploy.
+
+6. What is an Overlay Network?
+-------------------------------
+An overlay network is a virtual network that enables containers running on different Swarm nodes to communicate securely.
+
+7. What are Docker Secrets?
+-----------------------------
+Docker Secrets securely store sensitive information (such as passwords and certificates) and make it available only to authorized services at runtime.
+
+8. What is a Rolling Update?
+-----------------------------
+A rolling update replaces service replicas gradually with a new version, reducing or eliminating application downtime.
+
+9. How do you scale a service?
+-----------------------------
+docker service scale internetbanking=5
+
+10. How do you roll back a failed update?
+--------------------------------------
+docker service rollback internetbanking
+
+This restores the service to its previous working version.
+
+
+
+Replicated Service vs Global Service
+=====================================
+
+Replicated Service
+------------------
+Scaling up or down by giving a desired number of replicas
+
+It does not guarantee to run one replica on each node.
+
+After deleting a worker node, it will still distribute the same number of replicas mentioned while running to the available nodes.
+
+Applications are horizontally scaled up or down.
+
+Example: A web server has 5 replicas.
+
+Global Service : If we want every node to have a container which has a some service to run.
+--------------
+A global service in Docker Swarm is a service that runs a single task/container on each node in a swarm. Global services are used to monitor containers that want to run on a Swarm node.
+
+Can not scale up or down by giving a desired number.
+
+It guarantees to run one replica on each node.
+
+After deleting a node, the total replica number will decrease by one.
+
+Ideal for those that need one instance per node, like a monitoring agent.
+
+Example: A log collector is running on each node to collect logs.
+-------------------------------------------------------------------
+In the below example, we are not mentioning any replicas, but as it is global service, it will create a replica in all nodes
+
+vi docker-compose.yml
+
+version: "3.8"
+services:
+  global-nginx:
+    image: nginx
+    deploy:
+      mode: global
+    ports:
+      - "80:80"
+
+docker stack deploy -c docker-compose.yml global-stack
+
+docker service ls
+
+Command
+---------
+
+docker service create --name nginx-global --mode global --publish 80:80 nginx
+
+
+docker service ps nginx-global
