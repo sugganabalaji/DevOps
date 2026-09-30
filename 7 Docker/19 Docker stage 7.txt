@@ -1,0 +1,760 @@
+Ec2 amazon linux 2023 6.1 kernel AMI, c7i.flex/large, 20GB
+
+-- yum install docker -y
+-- systemctl start docker
+-- clear
+=======================================
+
+
+
+
+Download portainer yaml
+-----------------------
+curl -L https://downloads.portainer.io/ce2.16/portainer-agent-stack.yml -o portainer-agent-stack.yml
+
+docker stack deploy -c portainer-agent-stack.yml portainer
+
+docker ps
+
+public-ip of swarm master:9443
+
+Tried accessing:
+
+https://13.232.175.129:9443 → Portainer UI (default HTTPS port)
+admin/root@123456 > Create user
+
+https://13.232.175.129:5000 → Portainer agent service
+
+docker service logs portainer_portainer
+
+Environment --> Primary
+
+
+TASK: Portainer Using SWARM
+====
+Portainer on standalone docker
+--------------------------------
+Explore application
+    https://phoenixnap.com/kb/docker-portainer-install
+
+docker volume create portainer_data
+
+docker run -d -p 8000:8000 -p 9443:9443 --name portainer \
+    --restart=always \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v portainer_data:/data \
+    portainer/portainer-ce:2.9.3
+
+docker ps
+
+https://IP:9443 [use https forcely in browser]
+
+https://13.232.175.129:9443 → Portainer UI (default HTTPS port)
+    admin/root@123456 > Create user
+https://13.232.175.129:5000 → Portainer agent service
+
+Following command to start a portainer Agent container on the system you want to add:
+
+docker run -d -p 9001:9001 --name portainer_agent \
+  --restart=always \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v /var/lib/docker/volumes:/var/lib/docker/volumes \
+  portainer/agent:2.9.3
+
+
+Then in Portainer UI: Add Environment
+    Go to Environments → Add environment.
+    Name: e.g., Docker
+    Environment URL: Public-IP:9001
+
+13.232.175.129:9001
+
+connect.
+
+Deploy a Test Container
+-----------------------
+Inside Portainer:
+    Go to Local → Containers → Add container.
+    Example:
+        Name: Apache
+        Image: httpd
+
+    Manual Network port:
+        + publish new network port
+            host 8080 → container 80
+    Click Deploy the container.
+
+Access it at: http://<your-server-ip>:8080.
+    http://13.232.175.129:8080
+See message It works.
+
+-- docker ps -a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+================================================
+Distroless Images in Docker : Docker on Diet :-)
+=============================
+Distroless images are minimal container images that contain only the necessary runtime dependencies for an application—without including an entire Linux distribution (like Debian or Ubuntu). This makes them:
+
+✅ Smaller (Reduced attack surface & faster deployment)
+✅ More Secure (Fewer vulnerabilities, no package managers, shells, or extra tools)
+✅ Efficient (Uses fewer resources)
+
+No, Distroless images are not available on Docker Hub.
+
+Instead, they are hosted on Google Container Registry (GCR) under:
+
+gcr.io/distroless/base
+gcr.io/distroless/cc
+gcr.io/distroless/python3
+gcr.io/distroless/nodejs
+gcr.io/distroless/java
+
+Pull the images , tag it and push to DockerHub
+
+Step: Prerequisites
+    Docker installed and running.
+    A Docker Hub account (with login credentials).
+    Internet access to pull images from GCR.
+
+step: Log in to Docker Hub
+    -- docker login
+    Enter your <dockerhub-username>:sugganabalaji and <dockerhub-password>.
+
+Step: Pull Distroless Images from GCR
+    -- docker pull gcr.io/distroless/base
+    -- docker pull gcr.io/distroless/cc
+    -- docker pull gcr.io/distroless/python3
+    -- docker pull gcr.io/distroless/nodejs
+    -- docker pull gcr.io/distroless/java
+
+Step: Tag Images for Docker Hub
+    -- docker tag gcr.io/distroless/base sugganabalaji/distroless-base:latest
+    -- docker tag gcr.io/distroless/cc sugganabalaji/distroless-cc:latest
+    -- docker tag gcr.io/distroless/python3 sugganabalaji/distroless-python3:latest
+    -- docker tag gcr.io/distroless/nodejs sugganabalaji/distroless-nodejs:latest
+    -- docker tag gcr.io/distroless/java sugganabalaji/distroless-java:latest
+
+Step: Push Images to Docker Hub
+    -- docker push sugganabalaji/distroless-base:latest
+    -- docker push sugganabalaji/distroless-cc:latest
+    -- docker push sugganabalaji/distroless-python3:latest
+    -- docker push sugganabalaji/distroless-nodejs:latest
+    -- docker push <dockerhub-username>/distroless-java:latest
+
+Step: Verify on Docker Hub
+    Go to your Docker Hub profile [https://hub.docker.com/repositories/sugganabalaji]
+    You should see the newly pushed images listed.
+
+
+
+
+============================================
+Implementing Multi-Stage Builds:
+============================================
+- A multi-stage build utilizes multiple FROM statements within a single Dockerfile, each initiating a new build stage.
+- Artifacts from previous stages can be selectively copied into subsequent ones.
+
+- A multi-stage Docker build uses multiple FROM instructions in a single Dockerfile.
+- The first stage builds your application (using build tools like Maven or Gradle), and the second stage copies only the final artifact into a smaller runtime image.
+- This produces smaller, more secure images.
+
+-- mkdir docker
+-- cd docker
+-- yum install git -y
+-- yum install tree -y
+-- git clone https://github.com/sugganabalaji/java-project-maven-new.git
+
+java-project-maven-new/
+    ├── Dockerfile
+    ├── pom.xml
+    └── src/
+        └── main/
+
+-- cd java-project-maven-new
+
+vi Dockerfile
+
+# ---------- Stage 1 : Build ----------
+FROM maven:3.9.9-eclipse-temurin-17 AS build
+
+WORKDIR /app
+
+# Copy project files
+COPY . .
+
+# Build the WAR file
+RUN mvn clean package -DskipTests
+
+# ---------- Stage 2 : Runtime ----------
+FROM tomcat:10.1-jdk17-temurin
+
+# Remove default applications
+RUN rm -rf /usr/local/tomcat/webapps/*
+
+# Copy the generated WAR from the build stage
+COPY --from=build /app/target/*.war /usr/local/tomcat/webapps/ROOT.war
+
+EXPOSE 8080
+
+CMD ["catalina.sh", "run"]
+
+
+
+
+
+
+-- docker build -t my-web-app .
+
+-- docker run -d -p 8086:8080 my-web-app
+
+http://IP:8086
+
+
+
+
+Q1. What is a multi-stage build?
+--------------------------------
+A Docker feature that uses multiple FROM instructions to separate the build environment from the runtime environment, creating smaller and more secure images.
+
+Q2. Why use COPY --from?
+------------------------
+To copy only the required build artifacts (such as a JAR, WAR, or binary) from one stage to another without including build tools or source code.
+
+Q3. What are the advantages multi-stage build ?
+-----------------------------------------------
+Smaller image size
+Faster downloads and deployments
+Improved security
+Cleaner runtime image
+Easier maintenance
+
+This is the recommended approach for Java, Node.js, Go, .NET, and many other application types.
+
+==========================================
+Q. What is dockerfile. local?
+While the primary Dockerfile is often used for production environments to ensure optimized, secure, and reliable applications, dockerfile.local is the practice that has been established by the majority of development teams for local development environments.
+This file permits developers to create a Dockerfile specifically for their development needs such as mounting local directories, installing development dependencies, and setting environment variables suited for their local machine.
+
+=======================================================================================================================
+
+
+
+
+
+
+====================================================================
+Visual Flow
+=============
+
+Docker Client → Docker Daemon → Container Runtime → Containers
+
+
+docker run nginx
+        ↓
+Docker Client [CLI (docker run, docker build, Sends REST API calls]
+        ↓
+Docker Daemon (dockerd) [Brain of Docker, Builds images, runs containers, manages networks & volumes]
+        ↓
+containerd  [Modern Docker uses Container Runtime, containerd and runc]
+        ↓
+      runc
+        ↓
+Linux Kernel (namespaces + cgroups)
+        ↓
+Container running
+
+
+
+dockerd → containerd → runc → container process
+
+
+Docker follows a client-server architecture.
+When we run a command like docker run, the Docker client sends a request to the Docker daemon (dockerd) via REST API.
+Internally, the daemon uses container runtimes like 'containerd' and 'runc'.
+containerd manages the container lifecycle like manager (pulling images, storage, networking).
+'runc' is the low-level runtime that actually creates and starts the container process, works directly with Linux kernel, namespaces and cgroups.
+
+Isolation & Resource Management
+==================================
+Docker containers are not VMs — they use Linux kernel features:
+
+Namespaces → provide isolation
+    PID (process isolation)
+    NET (network isolation)
+    MNT (filesystem isolation)
+
+cgroups (control groups) → manage resource limits
+CPU
+Memory
+I/O
+
+Namespaces provide isolation (PID, network, mount, etc.), ensuring containers don’t see each other’s resources.
+
+cgroups control resource limits like CPU and memory, preventing one container from consuming all system resources.
+
+
+
+
+Layered Filesystem
+===================
+Docker images use a layered filesystem (UnionFS):
+
+Each image is made of multiple read-only layers
+When a container runs, Docker adds a writable layer on top
+Uses copy-on-write mechanism
+
+👉 Benefits:
+    Faster builds
+    Image reuse
+    Efficient storage
+
+“Docker uses containerd and runc to run containers as isolated processes using namespaces and cgroups, and leverages a layered filesystem for efficient image management.”
+
+
+Image Architecture (Important)
+=============================
+
+Docker uses Union File System
+Docker image is made of multiple layers:
+
+Layers:
+Layer 1: OS (Ubuntu)
+Layer 2: Python
+Layer 3: App
+Layer 4: Writable container layer
+
+Reusability, Faster builds , Less storage
+
+What is Copy-on-Write (CoW) ?
+=============================
+
+Files are not copied until modified
+
+Image layer: file.txt = "Hello"  , Container starts → no copy yet
+When you modify: file.txt = "Hello World", Docker Copies file to writable layer and Modifies there
+
+Copy-on-write means that Docker does not duplicate files from image layers until they are modified.
+When a change occurs, the file is copied to the container’s writable layer and modified there, improving efficiency.
+
+
+
+Container Lifecycle
+===================
+Created → Running → Paused → Stopped → Removed
+
+How do you reduce Docker image size ?
+=====================================
+Use smaller base images [FROM node:18-alpine]
+multi-stage builds  [Removes build tools from final image]
+Remove unnecessary files [RUN apt-get clean && rm -rf /var/lib/apt/lists/*]
+Combine RUN commands , it will reduces layers [RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*]
+Use distroless images [No shell, minimal]
+.dockerignore
+
+.dockerignore is used to exclude unnecessary files from the Docker build context, which helps reduce image size, improve build performance, and prevent sensitive files from being included in the image.
+
+
+Multi-Stage Build
+==================
+vi Dockerfile
+
+# Stage 1: Build
+FROM node:18 AS build
+WORKDIR /app
+
+COPY package*.json .
+RUN npm install
+
+COPY . .
+RUN npm run build
+
+# Stage 2: Serve
+FROM nginx:alpine
+COPY --from=build /app/build /usr/share/nginx/html
+
+
+
+It uses two stages:
+
+Build stage (Node.js)
+Runtime stage (Nginx)
+
+Uses a Node.js base image , Names this stage "as build", it will install npm dependencies
+Copy from Build Stage [COPY --from=build] , will copy the entire output of stage1 /app/build to /usr/share/nginx/html
+
+Final container only has: Nginx server and Static files (HTML, JS, CSS)
+
+👉 Node is NOT present in final image
+
+“Only the final stage is included in the resulting image — previous stages are discarded.”
+
+“Multi-stage build uses multiple FROM statements. The first stage builds the application using Node.js, and the second stage uses a lightweight Nginx image to serve the built files. This reduces image size, improves security, and separates build and runtime environments.”
+
+
+
+How do you secure Docker containers?
+=======================================
+👉 Points:
+        non-root user
+        minimal base image
+        image scanning
+        secrets management
+        read-only filesystem
+
+Image scanning is the process of checking a Docker image for:
+
+❗ Vulnerabilities (CVEs) Common Vulnerabilities and Exposures
+🔓 Security issues
+📦 Outdated packages
+Exposed secrets
+“Before deploying an image, we scan it to make sure it is secure.”
+
+Tools to scan: Docker Scout, Trivy
+
+
+Difference between CMD and EntryPoint
+====================================
+
+vi app.py
+
+import sys
+
+print("App started 🚀")
+print("Arguments passed:", sys.argv)
+
+
+==============
+
+vi Dockerfile
+
+FROM python:3.11
+
+WORKDIR /app
+COPY . .
+
+ENTRYPOINT ["python", "app.py"]
+CMD ["--env=prod"]
+
+
+docker build -t myapp .   [Build Docker Image called myapp]
+
+docker run myapp  [Run container from myapp image]
+
+output
+----
+App started 🚀
+Arguments passed: ['app.py', '--env=prod']
+
+ENTRYPOINT → python app.py
+CMD → --env=prod
+
+Override CMD
+============
+
+docker run myapp --env=dev
+
+output
+------
+App started 🚀
+Arguments passed: ['app.py', '--env=dev']
+
+See the difference:
+
+CMD changed
+ENTRYPOINT stayed same
+
+Summary
+--------
+ENTRYPOINT → fixed command
+CMD → default arguments
+docker run → overrides CMD
+
+ENTRYPOINT always executes the main application, while CMD acts as default arguments and gets overridden when passing parameters in docker run.”
+
+🔐 What is Rootless Docker?
+============================
+
+Rootless Docker means running Docker without root (admin) privileges.
+
+Normally:
+-------
+Docker daemon runs as root ❗
+Containers can potentially gain high privileges
+
+👉 In rootless Docker:
+------------------------
+Docker runs as a normal user ✅
+No root access required
+
+Why does a container stop immediately?
+------------------------------------
+👉 Main process exited (PID 1)
+
+
+What happens when you run docker run nginx?
+==========================================
+
+“Docker first checks if the image exists locally; if not, it pulls from a docker hub registry. Then it creates a container, sets up namespaces and cgroups for isolation, attaches networking, adds a writable layer, and finally executes the ENTRYPOINT/CMD to start the container process.”
+
+
+Docker Security
+===============
+
+Docker provides process isolation, but containers are not virtual machines. By default, containers share the host's Linux kernel. If Docker is not configured securely, a compromised container may affect the host or other containers.
+
+The goal of Docker security is to follow the Principle of Least Privilege, minimize the attack surface, and ensure containers run with only the permissions they actually need.
+
+
+Containers share the same Linux kernel.
+
+Unlike Virtual Machines, Containers DO NOT have their own kernel.
+
+Security Best Practices
+----------------------
+Use Official Images
+Keep Images Updated
+Run as Non-root User
+Drop Unnecessary Capabilities
+Scan Images Regularly
+Never Hardcode Secrets
+Use Read-only Filesystem
+Limit CPU & Memory
+Use Signed Images
+Keep Docker Updated
+
+
+What is Least Privilege?
+------------------------
+Every application should have only the minimum permissions required to perform its job.
+
+Bad Example: Web Application --> Root Access --> Can modify OS
+Good Example: Web Application --> Non-root User --> Limited Permissions
+
+Why? If a hacker compromises the application, they gain access only as appuser instead of root
+
+Why Non-root?
+------------
+Advantages
+    Better security
+    Prevent accidental deletion
+    Prevent host modifications
+    Reduced privilege escalation
+ __________________________________________________
+| Root             | Non-root                      |
+| ---------------- | ----------------------------- |
+| Full permissions | Limited permissions           |
+| Security risk    | More secure                   |
+| Can modify OS    | Cannot modify protected files |
+| Not recommended  | Recommended                   |
+|__________________|_______________________________|
+
+
+Docker Bench for Security
+--------------------------
+Docker Bench is an open-source script that checks Docker against security best practices (such as the Docker CIS Benchmark).
+
+Checks include:
+---------------
+Docker daemon configuration
+Host configuration
+Containers
+Images
+Networking
+Logging
+User permissions
+
+Run Docker Bench
+-----------------
+
+docker run --rm \
+    -it \
+    --net host \
+    --pid host \
+    --userns host \
+    --cap-add audit_control \
+    -v /etc:/etc:ro \
+    -v /var/lib:/var/lib:ro \
+    -v /var/run/docker.sock:/var/run/docker.sock:ro \
+    -v /usr/lib/systemd:/usr/lib/systemd:ro \
+    docker/docker-bench-security
+
+
+Linux Capabilities
+--------------------
+
+Linux divides root privileges into smaller units called capabilities.
+
+Instead of giving a container full root access, give only required capabilities.
+
+Common Capabilities
+ ______________________________________________________________
+| Capability       | Purpose                                   |
+| ---------------- | ----------------------------------------- |
+| NET_ADMIN        | Configure network interfaces              |
+| NET_BIND_SERVICE | Bind to ports below 1024                  |
+| SYS_ADMIN        | Administrative operations (very powerful) |
+| SYS_TIME         | Change system time                        |
+| CHOWN            | Change file ownership                     |
+|__________________|___________________________________________|
+
+No need to run
+-----------
+
+docker run \
+    --cap-drop ALL \
+    --cap-add NET_BIND_SERVICE \
+    nginx
+
+
+Image Scanning
+---------------
+
+Images may contain
+
+    Vulnerabilities
+    Malware
+    Old packages
+    CVEs (Common Vulnerabilities and Exposures)
+
+Always scan images before deployment.
+
+
+Docker Scout
+=============
+Docker Scout is Docker's built-in image security and supply-chain analysis tool.
+
+It can
+
+    Detect CVEs
+    Suggest safer base images
+    Recommend package updates
+    Compare image versions
+    Show dependency information
+
+
+
+
+Install Docker scout
+---------------------
+
+cd /tmp
+
+curl -LO https://github.com/docker/scout-cli/releases/download/v1.23.1/docker-scout_1.23.1_linux_amd64.tar.gz
+
+ls -lh docker-scout_1.23.1_linux_amd64.tar.gz
+
+tar -xzf docker-scout_1.23.1_linux_amd64.tar.gz
+
+mkdir -p ~/.docker/cli-plugins
+
+cp docker-scout ~/.docker/cli-plugins/
+
+chmod +x ~/.docker/cli-plugins/docker-scout
+
+docker scout version
+
+docker login
+
+docker pull nginx
+
+docker scout cves nginx
+
+- CVE stands for Common Vulnerabilities and Exposures.
+
+
+If any error
+-----------
+rm -f /tmp/docker-scout
+mkdir -p /tmp/docker-scout
+chmod 777 /tmp/docker-scout
+
+docker scout cves nginx    [It might not run on t3.micro, use bigger machine]
+
+
+Security Checklist
+--------------------
+Use Official Images              ✔
+Run Non-root                     ✔
+Scan Images                      ✔
+Docker Scout                     ✔
+Read-only Filesystem             ✔
+Drop Capabilities                ✔
+Secrets                          ✔
+Limit Resources                  ✔
+Keep Images Updated              ✔
+
+
+
+1. Why shouldn't Docker containers run as root?
+- Running as root gives the application elevated privileges. If the container is compromised, an attacker has more opportunities to perform privileged operations.
+- Running as a non-root user reduces that risk.
+
+2. What is the Principle of Least Privilege?
+- It means granting users, applications, and containers only the permissions they require—no more and no less.
+
+3. What is Docker Bench?
+- Docker Bench for Security is an open-source tool that checks a Docker host and its configuration against security best practices and the Docker CIS Benchmark.
+
+4. What is Docker Scout?
+- Docker Scout is Docker's security tool for analyzing images, identifying vulnerabilities (CVEs), comparing images, and providing remediation recommendations.
+
+5. Why should Docker images be scanned?
+- To identify known vulnerabilities, outdated packages, and security issues before deploying images to production.
+
+6. Why shouldn't secrets be stored in a Dockerfile?
+- Anyone with access to the image can inspect it and retrieve embedded secrets. Sensitive information should be injected securely at runtime.
+
+7. What are Linux capabilities?
+- Linux capabilities split root privileges into smaller permission sets. Docker can add or remove these capabilities so containers receive only the privileges they actually need.
+
+8. What is a read-only container?
+- A read-only container runs with an immutable root filesystem. The application cannot modify files except in explicitly writable locations such as mounted volumes or tmpfs directories.
+
+9. What are the most important Docker security best practices?
+
+- Run as a non-root user.
+- Use trusted, up-to-date images.
+- Scan images regularly.
+- Protect secrets properly.
+- Drop unnecessary capabilities.
+- Use a read-only filesystem where possible.
+- Keep Docker and dependencies updated.
+- Limit CPU and memory resources.
+- Avoid running containers with unnecessary privileged options.
+
+
+
+
+Docker Interview Questions
+---------------------------
+Docker vs VM
+CMD vs ENTRYPOINT
+COPY vs ADD
+EXPOSE vs -p
+Volume vs Bind Mount
+Image vs Container
+Docker Compose vs Swarm
+RUN vs CMD
+ENV vs ARG
+save vs export
+load vs import
+attach vs exec
+restart policies
+HEALTHCHECK
+Multi-stage builds
+Why Alpine?
+OCI
+Overlay Network

@@ -17,9 +17,9 @@ Now open manager tab > click MultiExec mode.
 
 click X Exit multi-execution mode.
 
-=============
+================================
 DOCKER SWARM - High Availability
-=============
+================================
 
 Diagram docker swarm.png
 
