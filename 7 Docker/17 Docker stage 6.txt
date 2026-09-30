@@ -571,7 +571,7 @@ secrets:
   db_password:
     external: true
 
-
+ __________________________________________________________________
 | Docker Compose                   | Docker Swarm                  |
 | -------------------------------- | ----------------------------- |
 | Single host                      | Multi-host cluster            |
@@ -580,20 +580,20 @@ secrets:
 | No built-in scaling across hosts | Supports replicas and scaling |
 | No built-in high availability    | High availability             |
 | Local networking                 | Overlay networking            |
-
+|__________________________________|_______________________________|
 
 1. What is Docker Swarm?
 -------------------------
 Docker Swarm is Docker's native orchestration platform that manages multiple Docker hosts as a single cluster.
 
 2. What is the difference between a Manager and a Worker?
--------------------------------------------------------
+ _____________________________________________________
 | Manager                 | Worker                    |
 | ----------------------- | ------------------------- |
 | Controls the cluster    | Runs tasks/containers     |
 | Schedules services      | Executes assigned work    |
 | Maintains cluster state | Cannot manage the cluster |
-
+|_________________________|___________________________|
 
 3. What is a Service?
 ----------------------
@@ -636,7 +636,7 @@ Replicated Service vs Global Service
 
 Replicated Service
 ------------------
-Scaling up or down by giving a desired number of replicas
+Scaling up or down by giving a desired number of replicas.
 
 It does not guarantee to run one replica on each node.
 
@@ -673,14 +673,12 @@ services:
     ports:
       - "80:80"
 
-docker stack deploy -c docker-compose.yml global-stack
+-- docker stack deploy -c docker-compose.yml global-stack
 
-docker service ls
+-- docker service ls
 
 Command
 ---------
+-- docker service create --name nginx-global --mode global --publish 80:80 nginx
 
-docker service create --name nginx-global --mode global --publish 80:80 nginx
-
-
-docker service ps nginx-global
+-- docker service ps nginx-global
