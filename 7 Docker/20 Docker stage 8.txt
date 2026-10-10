@@ -1,0 +1,321 @@
+DOCKER - PROJECT
+================
+
+Manager  - c7i.flex.large
+    Ec2 amazon Linux 2023 kernel6.1 AMI, c7i.flex.large, 20GB
+
+WorkerNode1 -t3.micro
+WorkerNode2 - t3.micro
+
+
+1. Launch 3 Amazon Linux 3 instances
+    i. DockerSwarm
+    ii. Worker Node 1
+    iii. Worker Node 2
+2. Open MobaXterm and connect to all machines
+3. Go to multi-exec and install docker and start
+   -- yum install -y docker
+   -- systemctl start docker
+   -- clear
+set hostnames for all
+
+sudo -s
+hostnamectl set-hostname manager  --> In manager node
+sudo -i
+
+sudo -s
+hostnamectl set-hostname worker1
+sudo -i
+
+sudo -s
+hostnamectl set-hostname worker2
+sudo -i
+
+
+In Manager Node
+
+-- docker swarm init
+
+
+IN worker node1
+-- docker swarm join --token SWMTKN-1-1685h9sqqnoxxm5k51fyvjue6pfu1wduuxjljxj4qj123x11zz-9fuc0cqel2riu26m5kq813x0v 172.31.44.37:2377
+
+
+In Worker Node2
+-- docker swarm join --token SWMTKN-1-1685h9sqqnoxxm5k51fyvjue6pfu1wduuxjljxj4qj123x11zz-9fuc0cqel2riu26m5kq813x0v 172.31.44.37:2377
+
+In Manager node
+
+-- docker node ls
+
+--> install Jenkins on master node
+-- vi Jenkins.sh
+copy paste the script
+[https://github.com/sugganabalaji/devops-scripts/blob/master/jenkins.sh]
+
+-- sh Jenkins.sh [selection 2]
+-- press q
+
+--> if doesn't work see if Jenkins containers is already there as we did docker swarm -- for that docker service rm Jenkins
+
+http://Manager-IP:8080 and ready Jenkins
+
+Run the below command to work docker in Jenkins pipeline otherwise pipeline will not work
+-----------------------------------------------------------------------------------------
+docker needs to talk Jenkins.
+
+Run in docker host - manager
+
+-- chmod 777 /var/run/docker.sock
+-- systemctl daemon-reload
+-- systemctl restart docker.service
+
+
+Now lets create a pipeline in Jenkins
+-------------------------------------
+
+Get code from GitHub --> as Dockerfile exits in the repo, we can build using pipeline
+-- https://github.com/sugganabalaji/dockerproject
+
+But we don't have only 1 image, we need to create multiple images like internetbanking, Mobilebanking, loan and insurance
+For this, lets have image as a variable not a direct entry in pipeline as docker build -t internetbanking:v1 , instead use docker build -t $image
+
+create image as a parameter
+
+In Pipeline select : This project is parameterized --> Add Parameter --> choice parameter
+Name:  image
+choices :
+    internetbanking:v1
+    mobilebanking:v1
+    insurance:v1
+    loans:v1
+
+Name:  repo
+choices :
+    sugganabalaji/ib-image
+    sugganabalaji/mb-image
+    sugganabalaji/insurance
+    sugganabalaji/loans
+
+Manage Jenkins > System > Environmental Variables
+    Add >
+        Name: Password
+        Value: Balubava@2018
+save
+
+pipeline {
+    agent any
+
+    stages {
+        stage('checkout') {
+            steps {
+                git 'https://github.com/sugganabalaji/dockerproject.git'
+            }
+        }
+        stage('build') {
+            steps {
+                sh 'docker build -t $image .'
+            }
+        }
+        stage('Tagging') {
+            steps {
+                sh 'docker tag $image $repo'
+            }
+        }
+        stage('Login&Push') {
+            steps {
+                sh 'docker login -u sugganabalaji -p $password'
+                sh 'docker push $repo'
+            }
+        }
+        stage('Deploy') {
+            steps {
+                sh 'docker stack deploy -c docker-compose.yml my-app'
+            }
+        }
+     }
+}
+
+
+Save
+
+Build with Parameter
+    image: internetbanking:v1
+    repo: sugganabalaji/ib-image
+
+    Build
+
+In Docker host/manager , see image got created
+
+docker images --> you should see internetbanking:v1 image
+docker ps -a
+docker stack ls
+docker stack services my-app
+
+
+----
+Now lets tag
+----
+
+As we need to create multiple repo and images, we need to create a parameter for repo , go up in same pipeline --> Add parameters
+
+Name: repo  -- keep always small letters because in pipeline also $repo
+choices :
+    sugganabalaji/ib-image
+    sugganabalaji/mb-image
+    sugganabalaji/insurance-image
+    sugganabalaji/loans-image
+
+IN pipeline add
+
+ stage('tagging') {
+    steps {
+        sh 'docker tag $image $repo'
+    }
+}
+
+
+
+Now in docker host --> docker images -> you can see now new image with new tag
+
+Now images are stored locally , now push to DockerHub , for this we need to authenticate to DockerHub
+
+In Jenkins, we have local and global variables
+
+Manage Jenkins --> System --> Environment variables
+Name: password
+value: give here DockerHub password
+
+
+        stage('push') {
+            steps {
+                sh 'docker login -u sugganabalaji -p $password'
+                sh 'docker push $repo'
+            }
+        }
+
+Now build the pipeline with internetbanking --> image will be stored in DockerHub --> login to DockerHub and show the image
+
+Now, change index.html in GitHub from InternetBanking to MobileBanking --> Build Pipeline --> MobileBanking --> sugganabalaji/mb-image
+Now, change index.html in GitHub from MobileBanking to Insurance --> Build Pipeline --> Insurance --> sugganabalaji/insurance-image
+Now, change index.html in GitHub from Insurance to Loans --> Build Pipeline --> Loans --> sugganabalaji/Loans-image
+
+Now a new repos and image will be created in DockerHub
+
+Note: In realtime we don't use webhook because if developer push automatically pipeline will run which is danger.
+
+Till now, we created images lets now do deployment
+
+=== Now Deployment ===
+
+Let's use docker swarm to have HA , for this we need containers, lets use docker-compose
+And docker compose is used to create multiple containers but in single host, but we need containers in all hosts(workernodes)
+Lets use docker stack
+
+show docker-compose.yml in GitHub
+
+version: '3.8'
+services:
+  internetbanking:
+    image: sugganabalaji/ib-image:latest
+    ports:
+      - "81:80"
+    deploy:
+      replicas: 3
+    volumes:
+      - /var/lib/internetbanking
+  mobilebanking:
+    image: sugganabalaji/mb-image:latest
+    ports:
+      - "82:80"
+    deploy:
+      replicas: 3
+    volumes:
+      - /var/lib/mobilebanking
+  insurance:
+    image: sugganabalaji/insurance-image:latest
+    ports:
+      - "83:80"
+    deploy:
+      replicas: 3
+    volumes:
+      - /var/lib/insurance
+  loan:
+    image: sugganabalaji/loans-image:latest
+    ports:
+      - "84:80"
+    deploy:
+      replicas: 3
+    volumes:
+      - /var/lib/loan
+
+
+
+And add this below to pipeline , and bank is application name
+
+    stage('Deploy') {
+        steps {
+            sh 'docker stack deploy -c docker-compose.yml bank'
+        }
+    }
+
+-C --> compose file
+
+Now build the pipeline with insurance image and insurance repo.
+
+
+
+Some docker stack commands
+=====================
+
+docker stack ls
+docker stack services my-app
+
+
+docker service ls
+docker service rm stackname
+docker stack ls
+docker stack ps my-app
+
+
+pipeline {
+    agent any
+
+    stages {
+        stage('checkout') {
+            steps {
+                git 'https://github.com/sugganabalaji/dockerproject.git'
+            }
+        }
+        stage('build') {
+            steps {
+                sh 'docker build -t $image .'
+            }
+        }
+        stage('tag') {
+            steps {
+                sh 'docker tag $image $repo'
+            }
+        }
+        stage('push') {
+            steps {
+                sh 'docker login -u sugganabalaji -p $password'
+                sh 'docker push $repo'
+            }
+        }
+        stage('deploy') {
+            steps {
+                sh 'docker stack deploy bank -c docker-compose.yml'
+            }
+        }
+    }
+}
+
+
+
+-- docker rm -f $(docker ps -aq)
+-- docker ps -a
+-- docker rmi -f $(docker images -aq)
+-- docker images
+-- docker volume ls
+-- docker volume rm <vol-name>
