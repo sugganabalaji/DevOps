@@ -206,7 +206,7 @@ FROM tomcat:10.1-jdk17-temurin
 RUN rm -rf /usr/local/tomcat/webapps/*
 
 # Copy the generated WAR from the build stage
-COPY --from=build /app/target/*.war /usr/local/tomcat/webapps/ROOT.war
+COPY --from=build /app/target/*.war /usr/local/tomcat/webapps/myapp.war
 
 EXPOSE 8080
 
@@ -514,7 +514,8 @@ What happens when you run docker run nginx?
 Docker Security
 ===============
 
-Docker provides process isolation, but containers are not virtual machines. By default, containers share the host's Linux kernel. If Docker is not configured securely, a compromised container may affect the host or other containers.
+Docker provides process isolation, but containers are not virtual machines. By default, containers share the host's Linux kernel.
+If Docker is not configured securely, a compromised container may affect the host or other containers.
 
 The goal of Docker security is to follow the Principle of Least Privilege, minimize the attack surface, and ensure containers run with only the permissions they actually need.
 
@@ -650,6 +651,7 @@ It can
 
 Install Docker scout
 ---------------------
+Take bigger machine, in t3.micro it will not work.
 
 cd /tmp
 
