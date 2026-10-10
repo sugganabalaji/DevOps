@@ -8,11 +8,11 @@ Ec2 amazon linux 2023 6.1 kernel AMI, c7i.flex/large, 20GB
 
 
 
-Download portainer yaml
+Download Portainer yaml
 -----------------------
 curl -L https://downloads.portainer.io/ce2.16/portainer-agent-stack.yml -o portainer-agent-stack.yml
 
-docker stack deploy -c portainer-agent-stack.yml portainer
+docker stack deploy -c portainer-agent-stack.yml Portainer
 
 docker ps
 
@@ -152,7 +152,7 @@ Step: Push Images to Docker Hub
     -- docker push sugganabalaji/distroless-cc:latest
     -- docker push sugganabalaji/distroless-python3:latest
     -- docker push sugganabalaji/distroless-nodejs:latest
-    -- docker push <dockerhub-username>/distroless-java:latest
+    -- docker push sugganabalaji/distroless-java:latest
 
 Step: Verify on Docker Hub
     Go to your Docker Hub profile [https://hub.docker.com/repositories/sugganabalaji]
@@ -758,3 +758,11 @@ Multi-stage builds
 Why Alpine?
 OCI
 Overlay Network
+
+
+-- docker rm -f $(docker ps -aq)
+-- docker ps -a
+-- docker rmi -f $(docker images -aq)
+-- docker images
+--docker volume ls
+-- docker volume rm portainer_data
